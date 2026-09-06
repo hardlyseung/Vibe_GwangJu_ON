@@ -35,10 +35,20 @@
     </section>
 
     <aside class="faq-box">
-      <h2>안내 챗봇</h2>
-      <p class="faq-hint">궁금한 걸 눌러보세요</p>
+      <h2>빠른 FAQ</h2>
+      <p class="faq-hint">궁금한 걸 눌러보세요 (오프라인에서도 동작)</p>
       <div id="faq-questions" class="chip-row vertical"></div>
       <div id="faq-answer" class="faq-answer"></div>
+
+      <h2>AI 문화관광해설</h2>
+      <p class="faq-hint">지도에서 관광지를 먼저 선택하세요</p>
+      <div id="ai-selected-place" class="ai-selected-place">선택된 장소 없음</div>
+      <div id="persona-chips" class="chip-row"></div>
+      <div class="ai-input-row">
+        <input id="ai-question" type="text" placeholder="예: 이곳의 핵심 역사 이야기는?" />
+        <button id="ai-ask-btn" class="chip">질문하기</button>
+      </div>
+      <div id="ai-answer" class="faq-answer"></div>
     </aside>
   </main>
 

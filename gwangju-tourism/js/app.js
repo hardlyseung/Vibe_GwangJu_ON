@@ -1,12 +1,14 @@
 // 광주 나들이 지도 - 프로토타입 스크립트
-// TODO: data/spots.sample.json 을 실제 광주관광공사 CSV 기반 데이터로 교체하세요 (data/spots.json 권장 파일명).
+// TODO: data/places.json 을 실제 광주관광공사 CSV/가이드북 기반 데이터로 교체하세요 (특히 history_details의 TODO 항목).
 
-const DATA_URL = "data/spots.sample.json";
+const DATA_URL = "data/places.json";
 
 let allSpots = [];
 let activeTheme = null;
 let map = null;
 let markers = [];
+let selectedPlace = null;
+let selectedPersona = "general";
 
 async function loadData() {
   const res = await fetch(DATA_URL);
@@ -46,12 +48,15 @@ function renderMarkers(spots) {
 }
 
 function showSpotDetail(spot) {
+  selectedPlace = spot;
+  document.getElementById("ai-selected-place").textContent = `선택된 장소: ${spot.name}`;
+
   const answerBox = document.getElementById("faq-answer");
   answerBox.innerHTML = `
     <strong>${spot.name}</strong><br/>
     ${spot.description}<br/>
     주소: ${spot.address}<br/>
-    주차: ${spot.parking} · 운영시간: ${spot.hours}
+    주차: ${spot.parking} · 운영시간: ${spot.operating_hours}
   `;
 }
 
@@ -164,6 +169,71 @@ function renderFaqBot() {
   });
 }
 
+function renderPersonaChips() {
+  const box = document.getElementById("persona-chips");
+  const personas = [
+    { id: "general", label: "일반" },
+    { id: "family", label: "가족/어린이" },
+    { id: "history", label: "역사 탐방" },
+  ];
+
+  box.innerHTML = "";
+  personas.forEach((p, idx) => {
+    const chip = document.createElement("button");
+    chip.className = "chip" + (idx === 0 ? " active" : "");
+    chip.textContent = p.label;
+    chip.onclick = () => {
+      selectedPersona = p.id;
+      document.querySelectorAll("#persona-chips .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+    };
+    box.appendChild(chip);
+  });
+}
+
+// AI 서버리스 함수(/api/chat) 호출. Vercel에 GEMINI_API_KEY가 없으면 에러 메시지를 그대로 보여줌.
+async function askAi() {
+  const answerBox = document.getElementById("ai-answer");
+  const input = document.getElementById("ai-question");
+  const question = input.value.trim();
+
+  if (!selectedPlace) {
+    answerBox.textContent = "먼저 지도에서 관광지를 선택해 주세요.";
+    return;
+  }
+  if (!question) {
+    answerBox.textContent = "질문을 입력해 주세요.";
+    return;
+  }
+
+  answerBox.textContent = "답변 생성 중...";
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ placeId: selectedPlace.id, persona: selectedPersona, question }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      answerBox.textContent = `오류: ${data.error || "알 수 없는 오류"}`;
+      return;
+    }
+
+    answerBox.textContent = `${data.answer}\n\n[출처: ${data.source.name} (기준일: ${data.source.date})]`;
+  } catch (err) {
+    answerBox.textContent = "AI 서버에 연결할 수 없습니다. (로컬에서는 /api 함수가 동작하지 않을 수 있습니다 — Vercel 배포 후 확인)";
+  }
+}
+
+function setupAiForm() {
+  document.getElementById("ai-ask-btn").onclick = askAi;
+  document.getElementById("ai-question").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") askAi();
+  });
+}
+
 async function main() {
   const data = await loadData();
   allSpots = data.spots;
@@ -178,6 +248,8 @@ async function main() {
   renderSpotList(allSpots);
   renderStatChart();
   renderFaqBot();
+  renderPersonaChips();
+  setupAiForm();
 }
 
 main();

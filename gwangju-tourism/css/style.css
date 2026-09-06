@@ -164,6 +164,26 @@ body {
   border-radius: 8px;
   padding: 10px;
   min-height: 40px;
+  white-space: pre-line;
+}
+
+.ai-selected-place {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-input-row input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 .app-footer {

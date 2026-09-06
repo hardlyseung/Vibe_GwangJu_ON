@@ -1,30 +1,42 @@
-# 광주 나들이 지도 (가제) — 2026 광주관광공사 노코드·바이브코딩 공모전 프로토타입
+# 광주 ON AIR (가제) — 2026 광주관광공사 노코드·바이브코딩 공모전 프로토타입
 
 ## 지금 상태
-지도 + 테마 필터 + 관광지 목록 + 통계 차트 + 규칙 기반 안내 챗봇의 **뼈대**가 잡혀 있습니다.
-데이터는 전부 `data/spots.sample.json`의 **샘플(가짜) 데이터**이며, 실제 광주관광공사 CSV로 교체해야 합니다.
+지도 + 테마 필터 + 관광지 목록 + 통계 차트 + 규칙 기반 FAQ + **AI 문화관광해설(Direct-Context, No-RAG)** 뼈대가 잡혀 있습니다.
+데이터는 전부 `data/places.json`의 **샘플(가짜) 데이터**이며, 실제 광주관광공사 CSV·가이드북으로 교체해야 합니다.
 
-## 실행 방법 (로컬)
-1. `js/app.js`를 열어서 필요 없음 — 대신 `index.html`의 카카오맵 스크립트 태그에서
-   `YOUR_KAKAO_JS_KEY`를 발급받은 **JavaScript 키**로 교체
-2. 카카오 개발자 콘솔 → 내 애플리케이션 → 플랫폼 → Web 플랫폼 등록에 로컬 테스트 주소
-   (예: `http://localhost:5500`) 및 배포할 GitHub Pages 주소 추가
-3. VSCode의 Live Server 확장 등으로 `index.html`을 열어서 확인
-   (카카오맵 SDK는 `file://`로 직접 열면 동작하지 않을 수 있어 반드시 로컬 서버로 실행)
+프론트는 순수 HTML/CSS/JS(빌드 없음)를 유지하고, AI 호출만 서버리스 함수 하나(`api/chat.js`)로 처리합니다.
+→ **배포는 GitHub Pages가 아니라 Vercel**을 사용해야 합니다 (GitHub Pages는 서버리스 함수를 못 돌림).
 
-## 남은 TODO
-- [ ] `data/spots.sample.json` → 실제 CSV 기반 데이터로 교체 (파일명 `data/spots.json` 권장, `js/app.js`의 `DATA_URL` 상수 수정)
-  - CSV에 위도/경도가 없으면 카카오맵/구글맵에서 검색해 수동으로 좌표 채워넣기
-- [ ] `js/app.js`의 `renderStatChart()` 안 예시 숫자를 PDF에서 뽑은 실제 통계로 교체
-- [ ] 카카오맵 JavaScript 키 발급 및 `index.html`에 적용
-- [ ] GitHub Pages로 배포 (Settings → Pages → 이 폴더 또는 별도 배포 브랜치 지정)
-- [ ] 제출용 스크린샷/발표자료 준비, 데이터 출처 명시
+## 로컬 실행
+1. `index.html`의 카카오맵 스크립트 태그에서 `YOUR_KAKAO_JS_KEY`를 발급받은 **JavaScript 키**로 교체
+2. 카카오 개발자 콘솔 → 플랫폼 → Web 플랫폼에 로컬 주소(`http://localhost:5500` 등)와 Vercel 배포 주소 등록
+3. `npm i -g vercel` 후 이 폴더(`gwangju-tourism/`)에서 `vercel dev` 실행
+   → 정적 파일 + `/api/chat` 함수가 함께 로컬에서 동작 (Live Server만 쓰면 AI 기능은 테스트 안 됨, 지도/FAQ는 가능)
+
+## Vercel 배포
+1. GitHub 레포를 Vercel에 연결, **Root Directory를 `gwangju-tourism`으로 지정**
+2. Vercel 프로젝트 → Settings → Environment Variables에 `GEMINI_API_KEY` 등록
+   - **반드시 [ai.google.com/aistudio](https://ai.google.com/aistudio)의 진짜 무료 티어 키를 사용하세요.**
+   - GCP 체험판(트라이얼) 크레딧에 연결된 키는 쓰지 마세요 — 크레딧은 보통 90일/소진 시 만료되는데,
+     공모전 조건상 서비스는 **2027.3.31까지 계속 접속 가능해야 합니다.** 크레딧 만료로 서비스가 끊기면 운영 조건 위반입니다.
+3. 배포 후 카카오 개발자 콘솔에 Vercel 도메인을 Web 플랫폼으로 추가
+
+## 남은 TODO (우선순위 순)
+- [ ] `data/places.json`의 `TODO` 표시된 `history_details`/`visit_tips` 등을 **광주관광공사 관광 가이드북 PDF**(공사 자체 콘텐츠) 기반으로 채우기
+      → 데이터 활용성 심사(30점)에서 "공사 데이터" 비중을 높이는 핵심 작업
+- [ ] 18개 관광지 CSV 실데이터로 교체, 좌표 없으면 수동 입력
+- [ ] 카카오맵 JavaScript 키 발급 및 적용
+- [ ] `GEMINI_API_KEY` 발급 및 Vercel 환경변수 등록, AI 답변 실제 테스트 (일반/가족/역사 3톤 + 근거 없는 질문 거절 확인)
+- [ ] `js/app.js`의 `renderStatChart()` 예시 숫자를 PDF 통계로 교체
+- [ ] Vercel 배포, 모바일 실기기 테스트
+- [ ] 제출용 스크린샷/발표자료, 데이터 출처 명시
 
 ## 파일 구조
 ```
 gwangju-tourism/
-├── index.html        # 페이지 레이아웃
-├── css/style.css     # 스타일
-├── js/app.js         # 지도/필터/차트/챗봇 로직
-└── data/spots.sample.json  # 샘플 데이터 (교체 대상)
+├── index.html          # 페이지 레이아웃 (지도 + FAQ + AI 해설 패널)
+├── css/style.css        # 스타일
+├── js/app.js            # 지도/필터/차트/FAQ/AI 호출 로직
+├── data/places.json     # 샘플 데이터 (교체 대상, TODO 필드 참고)
+└── api/chat.js           # Vercel 서버리스 함수 — Gemini 호출 + 환각 방지 가드레일 프롬프트
 ```
