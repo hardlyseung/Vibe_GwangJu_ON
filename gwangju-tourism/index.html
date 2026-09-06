@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>광주 나들이 지도 (가제)</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>광주 나들이 지도 <span class="badge">가제</span></h1>
+    <p class="subtitle">광주관광공사 데이터로 보는 관광지 지도 · 통계 · 안내</p>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="filter-box">
+        <h2>테마 필터</h2>
+        <div id="theme-filters" class="chip-row"></div>
+      </section>
+
+      <section class="spot-list-box">
+        <h2>관광지 목록</h2>
+        <ul id="spot-list" class="spot-list"></ul>
+      </section>
+
+      <section class="chart-box">
+        <h2>관광 통계 <span class="todo">(PDF 데이터로 교체 예정)</span></h2>
+        <canvas id="stat-chart" height="180"></canvas>
+      </section>
+    </aside>
+
+    <section class="map-area">
+      <div id="map"></div>
+    </section>
+
+    <aside class="faq-box">
+      <h2>안내 챗봇</h2>
+      <p class="faq-hint">궁금한 걸 눌러보세요</p>
+      <div id="faq-questions" class="chip-row vertical"></div>
+      <div id="faq-answer" class="faq-answer"></div>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <p>데이터 출처: 광주관광공사 (교체 예정) · 본 서비스는 공모전 제출용 프로토타입입니다.</p>
+  </footer>
+
+  <!-- TODO: YOUR_KAKAO_JS_KEY 를 발급받은 JavaScript 키로 교체하세요 -->
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_JS_KEY&autoload=false"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
