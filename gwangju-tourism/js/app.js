@@ -31,7 +31,9 @@ function clearMarkers() {
 
 function renderMarkers(spots) {
   clearMarkers();
-  spots.forEach((spot) => {
+  spots
+    .filter((spot) => spot.lat && spot.lng)
+    .forEach((spot) => {
     const position = new kakao.maps.LatLng(spot.lat, spot.lng);
     const marker = new kakao.maps.Marker({ position, map });
     const infowindow = new kakao.maps.InfoWindow({
@@ -54,9 +56,9 @@ function showSpotDetail(spot) {
   const answerBox = document.getElementById("faq-answer");
   answerBox.innerHTML = `
     <strong>${spot.name}</strong><br/>
-    ${spot.description}<br/>
+    ${spot.summary}<br/>
     주소: ${spot.address}<br/>
-    주차: ${spot.parking} · 운영시간: ${spot.operating_hours}
+    문의: ${spot.phone} (${spot.organization})
   `;
 }
 
@@ -93,11 +95,12 @@ function renderSpotList(spots) {
   const list = document.getElementById("spot-list");
   list.innerHTML = "";
   spots.forEach((spot) => {
+    const hasCoords = spot.lat && spot.lng;
     const li = document.createElement("li");
     li.className = "spot-item";
-    li.innerHTML = `<div class="name">${spot.name}</div><div class="theme-tag">${spot.theme}</div>`;
+    li.innerHTML = `<div class="name">${spot.name}${hasCoords ? "" : " ⚠️"}</div><div class="theme-tag">${spot.theme}</div>`;
     li.onclick = () => {
-      map.panTo(new kakao.maps.LatLng(spot.lat, spot.lng));
+      if (hasCoords) map.panTo(new kakao.maps.LatLng(spot.lat, spot.lng));
       showSpotDetail(spot);
     };
     list.appendChild(li);
@@ -132,26 +135,26 @@ function renderFaqBot() {
   const box = document.getElementById("faq-questions");
   const questions = [
     {
-      label: "주차 가능한 곳은?",
+      label: "호국·의병 유적은 어디?",
       answer: () =>
         allSpots
-          .filter((s) => s.parking === "가능")
-          .map((s) => s.name)
-          .join(", ") + " 에서 주차가 가능합니다.",
-    },
-    {
-      label: "자연 테마 관광지는?",
-      answer: () =>
-        allSpots
-          .filter((s) => s.theme === "자연")
+          .filter((s) => s.theme === "호국·의병 유적")
           .map((s) => s.name)
           .join(", ") || "해당 테마 관광지가 없습니다.",
     },
     {
-      label: "역사문화 테마 관광지는?",
+      label: "5·18 관련 장소는?",
       answer: () =>
         allSpots
-          .filter((s) => s.theme === "역사문화")
+          .filter((s) => s.theme === "민주화·독립운동")
+          .map((s) => s.name)
+          .join(", ") || "해당 테마 관광지가 없습니다.",
+    },
+    {
+      label: "서원·향교는 어디?",
+      answer: () =>
+        allSpots
+          .filter((s) => s.theme === "서원·향교·누각")
           .map((s) => s.name)
           .join(", ") || "해당 테마 관광지가 없습니다.",
     },
@@ -239,7 +242,7 @@ async function main() {
   allSpots = data.spots;
 
   kakao.maps.load(() => {
-    const first = allSpots[0];
+    const first = allSpots.find((s) => s.lat && s.lng);
     initMap(first ? first.lat : 35.1595, first ? first.lng : 126.8526);
     renderMarkers(allSpots);
   });
