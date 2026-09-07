@@ -210,6 +210,16 @@ body {
   gap: 6px;
 }
 
+/* 단일 컬럼(모바일)에서는 페이지 자체가 스크롤된다. 목록 안에 스크롤을 또 두면
+   18곳 중 7곳만 보이고 나머지 11곳은 없는 것처럼 보인다.
+   위쪽 레이아웃 미디어쿼리가 아니라 여기 둬야 한다 — .spot-list 규칙보다 뒤여야 이긴다. */
+@media (max-width: 1100px) {
+  .spot-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
 .spot-item {
   width: 100%;
   min-height: 44px;
