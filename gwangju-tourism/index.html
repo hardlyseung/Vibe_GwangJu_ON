@@ -21,6 +21,10 @@
 
     <section class="list-section">
       <h2>문화관광해설 거점 <span id="spot-count" class="count"></span></h2>
+      <div class="list-tools">
+        <button id="nearby-btn" class="chip" type="button">내 위치에서 가까운 순</button>
+      </div>
+      <p id="location-status" class="status-line"></p>
       <ul id="spot-list" class="spot-list"></ul>
     </section>
   </aside>
@@ -60,10 +64,18 @@
   </aside>
 </main>
 
+<section class="datasets" aria-labelledby="datasets-heading">
+  <div class="datasets-inner">
+    <h2 id="datasets-heading">활용한 공공데이터</h2>
+    <p class="datasets-lead">
+      이 서비스는 광주광역시관광공사가 개방한 데이터를 현장에서 쓸 수 있는 형태로 재구성한 것입니다.
+      각 데이터가 서비스의 어느 기능을 구동하는지 아래에 밝힙니다.
+    </p>
+    <div id="dataset-list" class="dataset-list"></div>
+  </div>
+</section>
+
 <footer class="app-footer">
-  <p>
-    데이터 출처: 광주광역시관광공사 <strong>문화관광해설사 현황</strong> (기준일 2026-06-09)
-  </p>
   <p class="footer-sub">2026 광주관광공사 노코드·바이브코딩 AI 활용 데이터 공모전 출품작</p>
 </footer>
 

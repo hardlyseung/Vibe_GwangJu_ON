@@ -15,14 +15,18 @@ const PERSONAS = [
 ];
 
 const state = {
+  raw: null,
   spots: [],
   themes: [],
+  datasets: [],
   activeTheme: null,
   selected: null,
   persona: "general",
   map: null,
   markers: [],
   asking: false,
+  userPos: null, // 위치 권한을 허용했을 때만 채워진다
+  sortByDistance: false,
 };
 
 /* ---------- DOM 유틸 ---------- */
@@ -54,6 +58,27 @@ function coordStatus(spot) {
     spot.lng >= GWANGJU_BOUNDS.minLng &&
     spot.lng <= GWANGJU_BOUNDS.maxLng;
   return inBounds ? "ok" : "suspect";
+}
+
+function haversineKm(a, b) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat));
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function distanceFromUser(spot) {
+  if (!state.userPos || coordStatus(spot) === "missing") return null;
+  return haversineKm(state.userPos, spot);
+}
+
+function formatDistance(km) {
+  if (km === null) return "";
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
 
 function telHref(phone) {
@@ -96,13 +121,15 @@ function setupMap() {
   try {
     kakao.maps.load(() => {
       try {
-        const anchor = state.spots.find((s) => coordStatus(s) === "ok");
+        // 공유 링크로 특정 거점을 열었다면 그곳을, 아니면 좌표가 있는 첫 거점을 중심으로 잡는다.
+        const selected = state.selected && coordStatus(state.selected) !== "missing" ? state.selected : null;
+        const anchor = selected || state.spots.find((s) => coordStatus(s) === "ok");
         state.map = new kakao.maps.Map(document.getElementById("map"), {
           center: new kakao.maps.LatLng(
             anchor ? anchor.lat : GWANGJU_CENTER.lat,
             anchor ? anchor.lng : GWANGJU_CENTER.lng
           ),
-          level: 8,
+          level: selected ? 5 : 8,
         });
         renderMarkers(visibleSpots());
       } catch (err) {
@@ -155,7 +182,21 @@ function escapeHtml(text) {
 /* ---------- 목록 · 필터 ---------- */
 
 function visibleSpots() {
-  return state.activeTheme ? state.spots.filter((s) => s.theme === state.activeTheme) : state.spots;
+  const filtered = state.activeTheme
+    ? state.spots.filter((s) => s.theme === state.activeTheme)
+    : state.spots.slice();
+
+  if (!state.sortByDistance || !state.userPos) return filtered;
+
+  // 좌표가 없는 거점은 거리를 잴 수 없으므로 뒤로 보낸다.
+  return filtered.slice().sort((a, b) => {
+    const da = distanceFromUser(a);
+    const db = distanceFromUser(b);
+    if (da === null && db === null) return 0;
+    if (da === null) return 1;
+    if (db === null) return -1;
+    return da - db;
+  });
 }
 
 function renderThemeFilters() {
@@ -207,7 +248,12 @@ function renderSpotList() {
     }
 
     btn.appendChild(nameRow);
-    btn.appendChild(el("span", "spot-meta", `${spot.district} · ${spot.theme}`));
+
+    const km = distanceFromUser(spot);
+    const meta = km === null
+      ? `${spot.district} · ${spot.theme}`
+      : `${formatDistance(km)} · ${spot.district} · ${spot.theme}`;
+    btn.appendChild(el("span", "spot-meta", meta));
     btn.addEventListener("click", () => {
       if (state.map && status !== "missing") {
         state.map.panTo(new kakao.maps.LatLng(spot.lat, spot.lng));
@@ -222,11 +268,26 @@ function renderSpotList() {
 
 /* ---------- 상세 패널 ---------- */
 
+function shareUrlFor(spot) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("place", spot.id);
+  url.hash = "";
+  return url.toString();
+}
+
 function selectSpot(spot) {
   state.selected = spot;
   renderSpotList();
   renderDetail(spot);
   document.getElementById("ai-answer").textContent = "";
+
+  // 주소창을 갱신해 두면 이 화면 그대로 공유·재방문할 수 있다.
+  // file:// 등 일부 환경에서는 replaceState가 막히므로 실패해도 넘어간다.
+  try {
+    window.history.replaceState({}, "", shareUrlFor(spot));
+  } catch (err) {
+    /* 주소창 갱신 실패는 기능에 영향 없음 */
+  }
 }
 
 function addRow(dl, label, value) {
@@ -271,6 +332,12 @@ function renderDetail(spot) {
   route.target = "_blank";
   route.rel = "noopener";
   actions.appendChild(route);
+
+  const share = el("button", "btn", "링크 복사");
+  share.type = "button";
+  share.addEventListener("click", () => copyShareLink(spot, share));
+  actions.appendChild(share);
+
   panel.appendChild(actions);
 
   const status = coordStatus(spot);
@@ -290,6 +357,167 @@ function renderDetail(spot) {
       : `출처: ${spot.source_name}`;
     panel.appendChild(el("p", "source-line", src));
   }
+}
+
+async function copyShareLink(spot, button) {
+  const link = shareUrlFor(spot);
+  const original = button.textContent;
+
+  const done = (label) => {
+    button.textContent = label;
+    setTimeout(() => {
+      button.textContent = original;
+    }, 1800);
+  };
+
+  // clipboard API는 HTTPS(또는 localhost)에서만 동작한다. 실패하면 주소를 직접 보여준다.
+  try {
+    await navigator.clipboard.writeText(link);
+    done("복사됨");
+  } catch (err) {
+    const panel = document.getElementById("detail-panel");
+    const existing = panel.querySelector(".share-fallback");
+    if (existing) existing.remove();
+
+    const box = el("p", "notice share-fallback", `아래 주소를 직접 복사해 주세요: ${link}`);
+    panel.appendChild(box);
+    done("복사 실패");
+  }
+}
+
+/* ---------- 내 위치 ---------- */
+
+function setLocationStatus(message, isError) {
+  const node = document.getElementById("location-status");
+  node.textContent = message || "";
+  node.classList.toggle("status-error", Boolean(isError));
+}
+
+function geolocationErrorMessage(err) {
+  if (!err || typeof err.code !== "number") return "현재 위치를 확인하지 못했습니다.";
+  if (err.code === 1) return "위치 권한이 거부되었습니다. 브라우저 주소창의 권한 설정에서 허용해 주세요.";
+  if (err.code === 2) return "현재 위치를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+  if (err.code === 3) return "위치 확인이 지연되고 있습니다. 다시 시도해 주세요.";
+  return "현재 위치를 확인하지 못했습니다.";
+}
+
+function requestLocation() {
+  const button = document.getElementById("nearby-btn");
+
+  // 이미 켜져 있으면 원래 순서로 되돌린다.
+  if (state.sortByDistance) {
+    state.sortByDistance = false;
+    button.classList.remove("active");
+    button.setAttribute("aria-pressed", "false");
+    setLocationStatus("");
+    renderSpotList();
+    return;
+  }
+
+  if (!state.spots.some((s) => coordStatus(s) !== "missing")) {
+    setLocationStatus("거점 좌표가 아직 등록되지 않아 거리를 계산할 수 없습니다.", true);
+    return;
+  }
+
+  if (!("geolocation" in navigator)) {
+    setLocationStatus("이 브라우저는 위치 기능을 지원하지 않습니다.", true);
+    return;
+  }
+
+  if (window.isSecureContext === false) {
+    setLocationStatus("위치 기능은 https 주소에서만 동작합니다. 배포된 주소에서 사용해 주세요.", true);
+    return;
+  }
+
+  // 이미 위치를 받아둔 상태면 다시 묻지 않는다.
+  if (state.userPos) {
+    applyNearbySort();
+    return;
+  }
+
+  button.disabled = true;
+  setLocationStatus("현재 위치를 확인하는 중…");
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      state.userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      button.disabled = false;
+      applyNearbySort();
+    },
+    (err) => {
+      button.disabled = false;
+      setLocationStatus(geolocationErrorMessage(err), true);
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+  );
+}
+
+function applyNearbySort() {
+  const button = document.getElementById("nearby-btn");
+  state.sortByDistance = true;
+  button.classList.add("active");
+  button.setAttribute("aria-pressed", "true");
+
+  const nearest = visibleSpots()[0];
+  const km = nearest ? distanceFromUser(nearest) : null;
+  setLocationStatus(
+    km === null
+      ? "현재 위치를 기준으로 정렬했습니다."
+      : `가장 가까운 거점은 ${nearest.name} (${formatDistance(km)}) 입니다.`
+  );
+
+  renderSpotList();
+}
+
+/* ---------- 활용한 공공데이터 ---------- */
+
+function renderDatasets() {
+  const box = document.getElementById("dataset-list");
+  clear(box);
+
+  if (!state.datasets.length) {
+    box.appendChild(el("p", "empty-hint", "등록된 데이터셋 정보가 없습니다."));
+    return;
+  }
+
+  state.datasets.forEach((ds) => {
+    const card = el("article", "dataset-card");
+
+    const head = el("div", "dataset-head");
+    head.appendChild(el("h3", "dataset-name", ds.name));
+    const tags = el("div", "dataset-tags");
+    if (ds.format) tags.appendChild(el("span", "badge", ds.format));
+    if (ds.source_date) tags.appendChild(el("span", "badge", `기준일 ${ds.source_date}`));
+    head.appendChild(tags);
+    card.appendChild(head);
+
+    if (ds.provider) card.appendChild(el("p", "dataset-provider", ds.provider));
+
+    // 건수는 실제 데이터에서 세므로 데이터가 늘면 표시도 따라 바뀐다.
+    const records = ds.record_key && Array.isArray(state.raw[ds.record_key])
+      ? state.raw[ds.record_key].length
+      : null;
+    if (records !== null) {
+      card.appendChild(el("p", "dataset-count", `${records}${ds.record_unit || "건"}`));
+    }
+
+    if (Array.isArray(ds.powers) && ds.powers.length) {
+      card.appendChild(el("p", "dataset-label", "이 데이터가 구동하는 기능"));
+      const ul = el("ul", "dataset-powers");
+      ds.powers.forEach((p) => ul.appendChild(el("li", null, p)));
+      card.appendChild(ul);
+    }
+
+    if (ds.url) {
+      const link = el("a", "dataset-link", "원본 데이터 보기");
+      link.href = ds.url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      card.appendChild(link);
+    }
+
+    box.appendChild(card);
+  });
 }
 
 /* ---------- 규칙 기반 빠른 안내 ---------- */
@@ -495,7 +723,9 @@ async function main() {
     return;
   }
 
+  state.raw = data;
   state.spots = data.spots;
+  state.datasets = Array.isArray(data.datasets) ? data.datasets : [];
   state.themes = Array.isArray(data.themes)
     ? data.themes
     : [...new Set(state.spots.map((s) => s.theme).filter(Boolean))];
@@ -504,6 +734,16 @@ async function main() {
   renderSpotList();
   renderPersonaChips();
   renderFaq();
+  renderDatasets();
+
+  document.getElementById("nearby-btn").addEventListener("click", requestLocation);
+
+  // 공유 링크(?place=7)로 들어온 경우 해당 거점을 바로 연다.
+  const requested = new URLSearchParams(window.location.search).get("place");
+  if (requested) {
+    const spot = state.spots.find((s) => String(s.id) === requested);
+    if (spot) selectSpot(spot);
+  }
 
   // 지도는 마지막에. 실패해도 위의 기능들은 이미 살아 있다.
   setupMap();
