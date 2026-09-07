@@ -265,10 +265,6 @@ module.exports = async (req, res) => {
           generationConfig: {
             temperature: 0.2,
             maxOutputTokens: 1200,
-            // gemini-2.5-flash 는 기본적으로 추론 토큰을 쓰고, 그 토큰이 maxOutputTokens 를 함께 소모한다.
-            // 짧은 근거 기반 해설에는 추론이 필요 없는데, 그대로 두면 추론에 예산을 다 쓰고
-            // 본문이 빈 채 MAX_TOKENS 로 끝나 답변 가능한 질문까지 거절 문구가 나간다.
-            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         signal: controller.signal,
@@ -285,7 +281,8 @@ module.exports = async (req, res) => {
       } else if (upstream.status === 400 || upstream.status === 401 || upstream.status === 403) {
         sendJson(res, 500, { error: "AI 키 설정에 문제가 있습니다. 키 값과 재배포 여부를 확인해 주세요." });
       } else {
-        sendJson(res, 502, { error: "AI 응답을 생성하지 못했습니다." });
+        // 원문은 안 보내되, 상태코드는 숫자뿐이라 노출해도 안전하고 원인 추적에 필수적이다.
+        sendJson(res, 502, { error: `AI 응답을 생성하지 못했습니다. (업스트림 상태 ${upstream.status})` });
       }
       return;
     }

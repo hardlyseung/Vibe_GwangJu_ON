@@ -889,7 +889,9 @@ function errorMessageFor(status, payload) {
         : "서버에서 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     case 502:
     case 503:
-      return "AI 서비스에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+      return payload && payload.error
+        ? payload.error
+        : "AI 서비스에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
     case 504:
       return "응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.";
     default:
