@@ -454,6 +454,56 @@ body {
   display: none;
 }
 
+.chip-row-sub {
+  margin-top: 7px;
+}
+
+.chip-sm {
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 130px;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- AI가 답하지 못할 때의 사람 연결 ---------- */
+
+.handoff {
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: flex-start;
+}
+
+.handoff-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.handoff-body {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
 /* ---------- 목록 도구 · 위치 ---------- */
 
 .list-tools {
@@ -597,19 +647,110 @@ body {
   cursor: pointer;
 }
 
-/* ---------- 데이터 검증 기록 ---------- */
+/* ---------- 하단 밴드 하위 블록 ---------- */
 
-.quality-block {
+.sub-block {
   margin-top: 32px;
   padding-top: 26px;
   border-top: 1px solid var(--line);
 }
 
-.quality-block h3 {
+.sub-block h3 {
   margin: 0 0 6px;
   font-size: 15px;
   font-weight: 700;
 }
+
+/* ---------- 데이터로 본 광주 ---------- */
+
+.insight-headline {
+  margin: 0 0 20px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  max-width: 72ch;
+  color: var(--text-mid);
+}
+
+.insight-headline strong {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 26px;
+  max-width: 900px;
+}
+
+.insight-title {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.bar-label {
+  font-size: 12.5px;
+  color: var(--text-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 9px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+.bar-value {
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 운영 계획 ---------- */
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  max-width: 1100px;
+}
+
+.ops-item h4 {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.ops-item p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.65;
+}
+
+/* ---------- 데이터 검증 기록 ---------- */
 
 .quality-list {
   display: flex;

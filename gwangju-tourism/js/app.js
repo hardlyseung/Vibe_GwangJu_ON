@@ -14,6 +14,15 @@ const PERSONAS = [
   { id: "history", label: "역사 탐방" },
 ];
 
+// 원본 데이터는 한국어지만 답변 언어는 바꿀 수 있다. 번역 데이터를 따로 만들지 않아도
+// 외국인 관광객이 같은 근거 자료로 해설을 받는다.
+const LANGUAGES = [
+  { id: "ko", label: "한국어" },
+  { id: "en", label: "English" },
+  { id: "ja", label: "日本語" },
+  { id: "zh", label: "中文" },
+];
+
 const state = {
   raw: null,
   spots: [],
@@ -24,6 +33,8 @@ const state = {
   districtFilter: null,
   selected: null,
   persona: "general",
+  language: "ko",
+  search: "",
   map: null,
   markers: [],
   asking: false,
@@ -188,6 +199,15 @@ function visibleSpots() {
   if (state.activeTheme) filtered = filtered.filter((s) => s.theme === state.activeTheme);
   if (state.districtFilter) filtered = filtered.filter((s) => s.district === state.districtFilter);
 
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    filtered = filtered.filter((s) =>
+      [s.name, s.address, s.district, s.theme, s.organization]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q))
+    );
+  }
+
   if (!state.sortByDistance || !state.userPos) return filtered;
 
   // 좌표가 없는 거점은 거리를 잴 수 없으므로 뒤로 보낸다.
@@ -246,8 +266,10 @@ function renderSpotList() {
   document.getElementById("spot-count").textContent = `${spots.length}곳`;
 
   if (spots.length === 0) {
-    const li = el("li", "empty-hint", "해당 테마의 거점이 없습니다.");
-    list.appendChild(li);
+    const message = state.search
+      ? `'${state.search}' 검색 결과가 없습니다.`
+      : "조건에 맞는 거점이 없습니다.";
+    list.appendChild(el("li", "empty-hint", message));
     return;
   }
 
@@ -297,6 +319,7 @@ function selectSpot(spot) {
   renderSpotList();
   renderDetail(spot);
   document.getElementById("ai-answer").textContent = "";
+  clearHandoff();
 
   // 주소창을 갱신해 두면 이 화면 그대로 공유·재방문할 수 있다.
   // file:// 등 일부 환경에서는 replaceState가 막히므로 실패해도 넘어간다.
@@ -743,6 +766,84 @@ function renderPersonaChips() {
   });
 }
 
+function renderLanguageChips() {
+  const box = document.getElementById("language-chips");
+  clear(box);
+
+  LANGUAGES.forEach((lang) => {
+    const chip = el("button", "chip chip-sm", lang.label);
+    chip.type = "button";
+    chip.setAttribute("aria-pressed", String(state.language === lang.id));
+    if (state.language === lang.id) chip.classList.add("active");
+    chip.addEventListener("click", () => {
+      state.language = lang.id;
+      renderLanguageChips();
+    });
+    box.appendChild(chip);
+  });
+}
+
+/* ---------- 데이터로 본 광주 ---------- */
+
+function renderInsights() {
+  const box = document.getElementById("insight-block");
+  clear(box);
+  if (!state.spots.length) return;
+
+  const total = state.spots.length;
+
+  const countBy = (key) => {
+    const counts = {};
+    state.spots.forEach((s) => {
+      const k = s[key];
+      if (k) counts[k] = (counts[k] || 0) + 1;
+    });
+    return Object.keys(counts)
+      .map((k) => ({ label: k, count: counts[k] }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  // 데이터에서 바로 읽히는 사실 하나를 문장으로 세운다.
+  const heritageThemes = ["호국·의병 유적", "민주화·독립운동"];
+  const heritage = state.spots.filter((s) => heritageThemes.includes(s.theme)).length;
+  const share = Math.round((heritage / total) * 100);
+
+  const lead = el("p", "insight-headline");
+  lead.appendChild(el("strong", null, `${total}곳 중 ${heritage}곳(${share}%)`));
+  lead.appendChild(
+    document.createTextNode("이 의병·호국 또는 민주화·독립운동과 관련된 장소입니다. 광주에 배치된 문화관광해설 인력이 어디에 집중돼 있는지를 보여줍니다.")
+  );
+  box.appendChild(lead);
+
+  const grid = el("div", "insight-grid");
+  [
+    { title: "테마별 분포", rows: countBy("theme") },
+    { title: "자치구별 분포", rows: countBy("district") },
+  ].forEach((group) => {
+    const col = el("div", "insight-col");
+    col.appendChild(el("h4", "insight-title", group.title));
+
+    const max = Math.max(...group.rows.map((r) => r.count), 1);
+    group.rows.forEach((row) => {
+      const line = el("div", "bar-row");
+      line.appendChild(el("span", "bar-label", row.label));
+
+      const track = el("span", "bar-track");
+      const fill = el("span", "bar-fill");
+      fill.style.width = `${(row.count / max) * 100}%`;
+      track.appendChild(fill);
+      line.appendChild(track);
+
+      line.appendChild(el("span", "bar-value", String(row.count)));
+      col.appendChild(line);
+    });
+
+    grid.appendChild(col);
+  });
+
+  box.appendChild(grid);
+}
+
 function setAsking(asking) {
   state.asking = asking;
   const btn = document.getElementById("ai-ask-btn");
@@ -793,6 +894,7 @@ async function askAi() {
   }
 
   setAsking(true);
+  clearHandoff();
   answerBox.textContent = "답변을 준비하고 있습니다…";
 
   const controller = new AbortController();
@@ -805,6 +907,7 @@ async function askAi() {
       body: JSON.stringify({
         placeId: state.selected.id,
         persona: state.persona,
+        language: state.language,
         question,
       }),
       signal: controller.signal,
@@ -833,6 +936,11 @@ async function askAi() {
       parts.push(`\n\n출처: ${payload.source.name}${date}`);
     }
     answerBox.textContent = parts.join("");
+
+    // 자료로 답하지 못한 경우에는 사람에게 넘긴다. AI가 멈추는 지점이 서비스가 멈추는 지점이 아니다.
+    if (payload.grounded === false || payload.blocked) {
+      showHandoff();
+    }
   } catch (err) {
     if (err.name === "AbortError") {
       answerBox.textContent = "응답이 지연되어 요청을 중단했습니다. 잠시 후 다시 시도해 주세요.";
@@ -844,6 +952,35 @@ async function askAi() {
     clearTimeout(timer);
     setAsking(false);
   }
+}
+
+function clearHandoff() {
+  const existing = document.querySelector(".handoff");
+  if (existing) existing.remove();
+}
+
+// AI가 답을 못 낼 때 현장 해설사로 연결하는 안내를 답변 아래에 붙인다.
+function showHandoff() {
+  const answerBox = document.getElementById("ai-answer");
+  const spot = state.selected;
+  if (!spot) return;
+
+  clearHandoff();
+
+  const box = el("div", "handoff");
+  box.appendChild(el("p", "handoff-title", "현장 문화관광해설사에게 물어보세요"));
+  box.appendChild(
+    el("p", "handoff-body", `${spot.name}은(는) ${spot.organization}이 관리합니다. 자료에 없는 내용은 현장에서 더 정확히 안내받을 수 있습니다.`)
+  );
+
+  const tel = telHref(spot.phone);
+  if (tel) {
+    const call = el("a", "btn btn-primary", `${spot.phone} 전화하기`);
+    call.href = tel;
+    box.appendChild(call);
+  }
+
+  answerBox.insertAdjacentElement("afterend", box);
 }
 
 function setupAiForm() {
@@ -910,12 +1047,20 @@ async function main() {
   renderThemeFilters();
   renderSpotList();
   renderPersonaChips();
+  renderLanguageChips();
   renderFaq();
   renderExhibitions();
   renderDatasets();
+  renderInsights();
   renderQuality();
 
   document.getElementById("nearby-btn").addEventListener("click", requestLocation);
+
+  document.getElementById("spot-search").addEventListener("input", (e) => {
+    state.search = e.target.value.trim();
+    renderSpotList();
+    renderMarkers(visibleSpots());
+  });
 
   // 공유 링크(?place=7)로 들어온 경우 해당 거점을 바로 연다.
   const requested = new URLSearchParams(window.location.search).get("place");

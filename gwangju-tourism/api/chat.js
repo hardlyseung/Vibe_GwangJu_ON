@@ -18,6 +18,30 @@ const PERSONA_INSTRUCTIONS = {
   history: "시대적 배경과 인물, 문화유산으로서의 가치를 중심으로 깊이 있게 설명하세요.",
 };
 
+// 근거 자료는 한국어 그대로 두고 출력 언어만 지정한다.
+// 번역본을 따로 만들지 않으므로 언어를 늘려도 근거의 일관성이 깨지지 않는다.
+const LANGUAGE_INSTRUCTIONS = {
+  ko: "한국어로 답변하세요.",
+  en: "Answer in English. The source material below is in Korean; translate faithfully and do not add facts that are not in it. Keep Korean proper nouns in romanized form with the Korean name in parentheses on first mention.",
+  ja: "日本語で回答してください。以下の資料は韓国語ですが、忠実に翻訳し、資料にない事実を追加しないでください。",
+  zh: "请用中文回答。以下资料为韩语，请忠实翻译，不要添加资料中没有的事实。",
+};
+
+// 자료로 답할 수 없을 때 쓰는 문장. 언어별로 준비해 두지 않으면 모델이 임의로 지어낸다.
+function refusalText(place, language) {
+  const phone = place.phone || "";
+  switch (language) {
+    case "en":
+      return `This information is not confirmed in the official tourism materials. Please contact the site directly at ${phone}.`;
+    case "ja":
+      return `この内容は公式観光資料では確認できませんでした。現地(${phone})までお問い合わせください。`;
+    case "zh":
+      return `该内容未能在官方旅游资料中得到确认。请拨打现场电话(${phone})咨询。`;
+    default:
+      return `해당 내용은 공식 관광 자료에서 확인되지 않았습니다. 현장 문의(${phone})로 확인해 주세요.`;
+  }
+}
+
 let placesCache = null;
 
 function loadPlaces() {
@@ -53,12 +77,16 @@ function buildGroundingBlock(place) {
   return lines.join("\n");
 }
 
-function buildSystemPrompt(place, persona, grounding) {
+function buildSystemPrompt(place, persona, grounding, language) {
   const personaLine = PERSONA_INSTRUCTIONS[persona] || PERSONA_INSTRUCTIONS.general;
-  const refusal = `해당 내용은 공식 관광 자료에서 확인되지 않았습니다. 현장 문의(${place.phone})로 확인해 주세요.`;
+  const languageLine = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.ko;
+  const refusal = refusalText(place, language);
 
   return `당신은 "광주 ON AIR"의 AI 문화관광해설사입니다.
 관광객은 지금 [${place.name}]에 대해 묻고 있습니다.
+
+[답변 언어]
+${languageLine}
 
 [해설 톤]
 ${personaLine}
@@ -116,6 +144,7 @@ module.exports = async (req, res) => {
   const placeId = Number(body.placeId);
   const question = typeof body.question === "string" ? body.question.trim() : "";
   const persona = typeof body.persona === "string" ? body.persona : "general";
+  const language = LANGUAGE_INSTRUCTIONS[body.language] ? body.language : "ko";
 
   if (!Number.isFinite(placeId) || !question) {
     sendJson(res, 400, { error: "거점과 질문이 모두 필요합니다." });
@@ -141,7 +170,7 @@ module.exports = async (req, res) => {
   }
 
   const source = { name: place.source_name, date: place.source_date };
-  const refusal = `해당 내용은 공식 관광 자료에서 확인되지 않았습니다. 현장 문의(${place.phone})로 확인해 주세요.`;
+  const refusal = refusalText(place, language);
   const grounding = buildGroundingBlock(place);
 
   // 근거 자료가 이름·주소 수준뿐이면 모델을 부를 필요도 없다. 할당량도 아끼고 환각 여지도 없앤다.
@@ -164,7 +193,9 @@ module.exports = async (req, res) => {
         },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: question }] }],
-          systemInstruction: { parts: [{ text: buildSystemPrompt(place, persona, grounding) }] },
+          systemInstruction: {
+            parts: [{ text: buildSystemPrompt(place, persona, grounding, language) }],
+          },
           generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
         }),
         signal: controller.signal,
@@ -197,11 +228,7 @@ module.exports = async (req, res) => {
 
     if (blockReason || (finishReason && blockedFinish.includes(finishReason))) {
       console.warn(`[chat] 차단됨 place=${place.name} reason=${blockReason || finishReason}`);
-      sendJson(res, 200, {
-        answer: `이 질문에는 자동 해설을 제공하기 어렵습니다. ${refusal}`,
-        blocked: true,
-        source,
-      });
+      sendJson(res, 200, { answer: refusal, blocked: true, source });
       return;
     }
 
