@@ -61,7 +61,7 @@ node scripts/geocode.js
 
 ### 5. Vercel 배포
 1. vercel.com 가입 (GitHub 계정) → Add New Project → 이 레포 import
-2. **Root Directory 를 `gwangju-tourism` 으로 지정**
+2. 다른 설정 건드릴 필요 없음 — 프로젝트 파일이 레포 최상위에 있어서 Root Directory 지정 불필요
 3. Settings → Environment Variables 에 `GEMINI_API_KEY` 등록
 4. Deploy
 5. **환경변수를 나중에 추가했다면 반드시 Redeploy** — 안 하면 계속 키 없음 오류가 난다
@@ -115,20 +115,22 @@ Live Server 같은 정적 서버로 열면 지도·목록·FAQ는 동작하지�
 
 ## 파일 구조
 
+레포 최상위에 바로 있다 (Vercel Root Directory 설정 불필요하게 하려고 이렇게 뒀다).
+최상위 `README.md`는 GitHub 프로필용이라 건드리지 않았다 — 프로젝트 설명은 이 파일(`SETUP.md`).
+
 ```
-gwangju-tourism/
-├── index.html                     # 화면 구조
-├── geocode.html                   # 좌표 채우기 도구 (브라우저에서 실행)
-├── css/style.css                  # 스타일 (다크모드 대응)
-├── js/app.js                      # 지도·필터·검색·상세·전시·AI 호출
-├── api/chat.js                    # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
-├── data/places.json               # 거점 18곳 + 데이터셋 선언 + 검증 기록 (해설 내용 TODO)
-├── data/exhibitions.json          # 전시회 (CSV 변환 전에는 빈 배열)
-├── scripts/geocode.js             # 주소 → 좌표 변환 (로컬 대안)
-├── scripts/convert-exhibitions.js # 전시회 CSV → JSON
-├── docs/METHODOLOGY.md            # AI 협업 개발 방법론
-├── CLAUDE.md                      # AI 도구용 작업 규칙
-└── vercel.json                    # 프레임워크 자동감지 비활성화
+index.html                     # 화면 구조
+geocode.html                   # 좌표 채우기 도구 (브라우저에서 실행)
+css/style.css                  # 스타일 (다크모드 대응)
+js/app.js                      # 지도·필터·검색·상세·전시·AI 호출
+api/chat.js                    # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
+data/places.json               # 거점 18곳 + 데이터셋 선언 + 검증 기록 (해설 내용 TODO)
+data/exhibitions.json          # 전시회 (CSV 변환 전에는 빈 배열)
+scripts/geocode.js             # 주소 → 좌표 변환 (로컬 대안)
+scripts/convert-exhibitions.js # 전시회 CSV → JSON
+docs/METHODOLOGY.md            # AI 협업 개발 방법론
+CLAUDE.md                      # AI 도구용 작업 규칙
+vercel.json                    # 프레임워크 자동감지 비활성화
 ```
 
 > `vercel.json` 때문에 배포가 이상하면 이 파일은 지워도 된다. 자동감지에 맡기는 것이 기본 동작이다.
