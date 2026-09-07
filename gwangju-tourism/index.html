@@ -1,63 +1,71 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
+<title>광주 ON AIR</title>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>광주 나들이 지도 (가제)</title>
 <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
-  <header class="app-header">
-    <h1>광주 나들이 지도 <span class="badge">가제</span></h1>
-    <p class="subtitle">광주관광공사 데이터로 보는 관광지 지도 · 통계 · 안내</p>
-  </header>
 
-  <main class="layout">
-    <aside class="sidebar">
-      <section class="filter-box">
-        <h2>테마 필터</h2>
-        <div id="theme-filters" class="chip-row"></div>
-      </section>
+<a class="skip-link" href="#spot-list">본문 바로가기</a>
 
-      <section class="spot-list-box">
-        <h2>관광지 목록</h2>
-        <ul id="spot-list" class="spot-list"></ul>
-      </section>
+<header class="app-header">
+  <div class="header-inner">
+    <h1>광주 ON AIR</h1>
+    <p class="subtitle">지도를 누르면 광주의 이야기가 시작됩니다</p>
+  </div>
+</header>
 
-      <section class="chart-box">
-        <h2>관광 통계 <span class="todo">(PDF 데이터로 교체 예정)</span></h2>
-        <canvas id="stat-chart" height="180"></canvas>
-      </section>
-    </aside>
-
-    <section class="map-area">
-      <div id="map"></div>
+<main class="layout">
+  <aside class="panel panel-list">
+    <section>
+      <h2 id="filter-heading">테마</h2>
+      <div id="theme-filters" class="chip-row" role="group" aria-labelledby="filter-heading"></div>
     </section>
 
-    <aside class="faq-box">
-      <h2>빠른 FAQ</h2>
-      <p class="faq-hint">궁금한 걸 눌러보세요 (오프라인에서도 동작)</p>
-      <div id="faq-questions" class="chip-row vertical"></div>
-      <div id="faq-answer" class="faq-answer"></div>
+    <section class="list-section">
+      <h2>문화관광해설 거점 <span id="spot-count" class="count"></span></h2>
+      <ul id="spot-list" class="spot-list"></ul>
+    </section>
+  </aside>
 
+  <section class="map-area" aria-label="관광지 지도">
+    <div id="map"></div>
+  </section>
+
+  <aside class="panel panel-detail">
+    <section id="detail-panel" class="detail-panel">
+      <p class="empty-hint">지도에서 거점을 선택하면 상세 정보가 표시됩니다.</p>
+    </section>
+
+    <section class="ai-section">
       <h2>AI 문화관광해설</h2>
-      <p class="faq-hint">지도에서 관광지를 먼저 선택하세요</p>
-      <div id="ai-selected-place" class="ai-selected-place">선택된 장소 없음</div>
-      <div id="persona-chips" class="chip-row"></div>
+      <div id="persona-chips" class="chip-row" role="group" aria-label="해설 톤 선택"></div>
       <div class="ai-input-row">
-        <input id="ai-question" type="text" placeholder="예: 이곳의 핵심 역사 이야기는?" />
-        <button id="ai-ask-btn" class="chip">질문하기</button>
+        <label class="sr-only" for="ai-question">질문 입력</label>
+        <input
+          id="ai-question"
+          type="text"
+          maxlength="200"
+          autocomplete="off"
+          placeholder="예: 이곳의 핵심 역사 이야기는?"
+        />
+        <button id="ai-ask-btn" class="btn btn-primary" type="button">질문</button>
       </div>
-      <div id="ai-answer" class="faq-answer"></div>
-    </aside>
-  </main>
+      <div id="ai-answer" class="answer-box" role="status" aria-live="polite"></div>
+    </section>
 
-  <footer class="app-footer">
-    <p>데이터 출처: 광주관광공사 (교체 예정) · 본 서비스는 공모전 제출용 프로토타입입니다.</p>
-  </footer>
+    <section>
+      <h2>빠른 안내</h2>
+      <p class="hint">AI 없이 데이터만으로 바로 답합니다.</p>
+      <div id="faq-questions" class="chip-row"></div>
+      <div id="faq-answer" class="answer-box" role="status" aria-live="polite"></div>
+    </section>
+  </aside>
+</main>
 
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=91c073489a8d4aaf847cf49ef9bbb679&autoload=false"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="js/app.js"></script>
-</body>
-</html>
+<footer class="app-footer">
+  <p>
+    데이터 출처: 광주광역시관광공사 <strong>문화관광해설사 현황</strong> (기준일 2026-06-09)
+  </p>
+  <p class="footer-sub">2026 광주관광공사 노코드·바이브코딩 AI 활용 데이터 공모전 출품작</p>
+</footer>
+
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=91c073489a8d4aaf847cf49ef9bbb679&autoload=false"></script>
+<script src="js/app.js"></script>
