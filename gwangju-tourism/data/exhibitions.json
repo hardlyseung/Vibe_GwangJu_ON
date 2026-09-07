@@ -1,0 +1,7 @@
+{
+  "_readme": "아직 원본 CSV를 변환하지 않은 상태입니다. 공공데이터포털에서 '광주광역시관광공사_주관전시회 개최 현황' CSV를 내려받아 `node scripts/convert-exhibitions.js <CSV경로>` 를 실행하면 이 파일이 채워집니다. 비어 있는 동안에는 화면에 전시 영역이 표시되지 않습니다.",
+  "source_name": "광주광역시관광공사_주관전시회 개최 현황",
+  "provider": "광주광역시관광공사",
+  "converted_at": null,
+  "exhibitions": []
+}

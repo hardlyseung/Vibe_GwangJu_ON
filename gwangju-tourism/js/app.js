@@ -17,9 +17,11 @@ const PERSONAS = [
 const state = {
   raw: null,
   spots: [],
+  exhibitions: [],
   themes: [],
   datasets: [],
   activeTheme: null,
+  districtFilter: null,
   selected: null,
   persona: "general",
   map: null,
@@ -182,9 +184,9 @@ function escapeHtml(text) {
 /* ---------- 목록 · 필터 ---------- */
 
 function visibleSpots() {
-  const filtered = state.activeTheme
-    ? state.spots.filter((s) => s.theme === state.activeTheme)
-    : state.spots.slice();
+  let filtered = state.spots.slice();
+  if (state.activeTheme) filtered = filtered.filter((s) => s.theme === state.activeTheme);
+  if (state.districtFilter) filtered = filtered.filter((s) => s.district === state.districtFilter);
 
   if (!state.sortByDistance || !state.userPos) return filtered;
 
@@ -210,15 +212,30 @@ function renderThemeFilters() {
     if (state.activeTheme === theme) chip.classList.add("active");
     chip.addEventListener("click", () => {
       state.activeTheme = theme;
+      state.districtFilter = null; // 테마를 고르면 자치구 한정은 푼다
       renderThemeFilters();
       renderSpotList();
       renderMarkers(visibleSpots());
+      setLocationStatus("");
     });
     return chip;
   };
 
   box.appendChild(makeChip("전체", null));
   state.themes.forEach((theme) => box.appendChild(makeChip(theme, theme)));
+
+  if (state.districtFilter) {
+    const active = el("button", "chip active", `${state.districtFilter} 해제`);
+    active.type = "button";
+    active.addEventListener("click", () => {
+      state.districtFilter = null;
+      renderThemeFilters();
+      renderSpotList();
+      renderMarkers(visibleSpots());
+      setLocationStatus("");
+    });
+    box.appendChild(active);
+  }
 }
 
 function renderSpotList() {
@@ -469,18 +486,168 @@ function applyNearbySort() {
   renderSpotList();
 }
 
+/* ---------- 지금 광주에서 (전시회) ---------- */
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function exhibitionPhase(ex, today) {
+  if (!ex.start_date || !ex.end_date) return "unknown";
+  if (ex.end_date < today) return "past";
+  if (ex.start_date > today) return "upcoming";
+  return "ongoing";
+}
+
+function formatPeriod(ex) {
+  if (!ex.start_date && !ex.end_date) return "일정 미정";
+  const trim = (d) => (d ? d.replace(/^\d{4}-/, "").replace("-", ".") : "?");
+  return `${trim(ex.start_date)} ~ ${trim(ex.end_date)}`;
+}
+
+function renderExhibitions() {
+  const band = document.getElementById("exhibition-band");
+  const box = document.getElementById("exhibition-list");
+
+  // 아직 CSV를 변환하지 않았으면 이 영역 자체를 감춘다. 빈 섹션을 보여주지 않는다.
+  if (!state.exhibitions.length) {
+    band.hidden = true;
+    return;
+  }
+
+  const today = todayIso();
+  const ranked = state.exhibitions
+    .map((ex) => ({ ex, phase: exhibitionPhase(ex, today) }))
+    .filter((row) => row.phase !== "past")
+    .sort((a, b) => {
+      const order = { ongoing: 0, upcoming: 1, unknown: 2 };
+      if (order[a.phase] !== order[b.phase]) return order[a.phase] - order[b.phase];
+      return String(a.ex.start_date || "").localeCompare(String(b.ex.start_date || ""));
+    });
+
+  // 진행 중·예정이 하나도 없으면 최근 것이라도 보여준다 (과거 데이터만 있는 경우).
+  const rows = ranked.length
+    ? ranked.slice(0, 6)
+    : state.exhibitions
+        .slice()
+        .sort((a, b) => String(b.start_date || "").localeCompare(String(a.start_date || "")))
+        .slice(0, 3)
+        .map((ex) => ({ ex, phase: "past" }));
+
+  if (!rows.length) {
+    band.hidden = true;
+    return;
+  }
+
+  band.hidden = false;
+  clear(box);
+
+  const phaseLabel = { ongoing: "진행 중", upcoming: "예정", past: "종료", unknown: "일정 미정" };
+
+  rows.forEach(({ ex, phase }) => {
+    const card = el("article", "exhibition-card");
+
+    const top = el("div", "exhibition-top");
+    top.appendChild(el("span", `badge phase-${phase}`, phaseLabel[phase]));
+    top.appendChild(el("span", "exhibition-period", formatPeriod(ex)));
+    card.appendChild(top);
+
+    card.appendChild(el("h3", "exhibition-name", ex.name));
+    if (ex.venue) card.appendChild(el("p", "exhibition-venue", ex.venue));
+
+    const facts = [];
+    if (ex.items) facts.push(ex.items);
+    if (ex.booths) facts.push(`부스 ${ex.booths}개`);
+    if (ex.companies) facts.push(`참여 ${ex.companies}개사`);
+    if (facts.length) card.appendChild(el("p", "exhibition-facts", facts.join(" · ")));
+
+    // 두 데이터셋을 잇는 지점: 전시 장소의 자치구로 해설 거점을 연결한다.
+    if (ex.district) {
+      const nearby = state.spots.filter((s) => s.district === ex.district);
+      if (nearby.length) {
+        const link = el("button", "linkish", `${ex.district}의 해설 거점 ${nearby.length}곳 보기`);
+        link.type = "button";
+        link.addEventListener("click", () => focusDistrict(ex.district));
+        card.appendChild(link);
+      }
+    }
+
+    if (ex.website) {
+      const site = el("a", "exhibition-site", "전시 홈페이지");
+      site.href = ex.website;
+      site.target = "_blank";
+      site.rel = "noopener";
+      card.appendChild(site);
+    }
+
+    box.appendChild(card);
+  });
+}
+
+// 전시 카드에서 자치구를 눌렀을 때 목록·지도를 그 자치구로 좁힌다.
+function focusDistrict(district) {
+  state.activeTheme = null;
+  state.districtFilter = district;
+  renderThemeFilters();
+  renderSpotList();
+  renderMarkers(visibleSpots());
+  setLocationStatus(`${district}의 해설 거점만 표시하고 있습니다.`);
+  document.querySelector(".layout").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 /* ---------- 활용한 공공데이터 ---------- */
+
+function renderQuality() {
+  const quality = state.raw && state.raw.data_quality;
+  const block = document.getElementById("quality-block");
+
+  if (!quality || !Array.isArray(quality.findings) || !quality.findings.length) {
+    block.hidden = true;
+    return;
+  }
+
+  block.hidden = false;
+  document.getElementById("quality-note").textContent = quality.note || "";
+
+  const list = document.getElementById("quality-list");
+  clear(list);
+
+  quality.findings.forEach((f) => {
+    const item = el("div", "quality-item");
+
+    const head = el("div", "quality-head");
+    head.appendChild(el("span", `badge kind-${f.kind}`, f.kind));
+    head.appendChild(el("span", "quality-dataset", f.dataset));
+    if (f.affected) head.appendChild(el("span", "quality-affected", `${f.affected}건`));
+    item.appendChild(head);
+
+    item.appendChild(el("p", "quality-issue", f.issue));
+    item.appendChild(el("p", "quality-action", f.action));
+    list.appendChild(item);
+  });
+}
+
+// 건수는 실제 로드된 배열에서 센다. 선언만 해두고 데이터가 없으면 0이 된다.
+function recordCount(ds) {
+  const collections = { spots: state.spots, exhibitions: state.exhibitions };
+  const arr = collections[ds.record_key];
+  return Array.isArray(arr) ? arr.length : 0;
+}
 
 function renderDatasets() {
   const box = document.getElementById("dataset-list");
   clear(box);
 
-  if (!state.datasets.length) {
+  // 실제로 데이터가 들어온 데이터셋만 보여준다. 쓰지도 않는 데이터를 활용했다고 적지 않는다.
+  const active = state.datasets.filter((ds) => recordCount(ds) > 0);
+
+  if (!active.length) {
     box.appendChild(el("p", "empty-hint", "등록된 데이터셋 정보가 없습니다."));
     return;
   }
 
-  state.datasets.forEach((ds) => {
+  active.forEach((ds) => {
     const card = el("article", "dataset-card");
 
     const head = el("div", "dataset-head");
@@ -493,13 +660,9 @@ function renderDatasets() {
 
     if (ds.provider) card.appendChild(el("p", "dataset-provider", ds.provider));
 
-    // 건수는 실제 데이터에서 세므로 데이터가 늘면 표시도 따라 바뀐다.
-    const records = ds.record_key && Array.isArray(state.raw[ds.record_key])
-      ? state.raw[ds.record_key].length
-      : null;
-    if (records !== null) {
-      card.appendChild(el("p", "dataset-count", `${records}${ds.record_unit || "건"}`));
-    }
+    card.appendChild(
+      el("p", "dataset-count", `${recordCount(ds)}${ds.record_unit || "건"}`)
+    );
 
     if (Array.isArray(ds.powers) && ds.powers.length) {
       card.appendChild(el("p", "dataset-label", "이 데이터가 구동하는 기능"));
@@ -710,6 +873,19 @@ async function loadData() {
   return json;
 }
 
+// 전시 데이터는 선택 사항이다. 파일이 없거나 아직 비어 있어도 나머지는 정상 동작해야 한다.
+async function loadExhibitions() {
+  try {
+    const res = await fetch("data/exhibitions.json", { cache: "no-cache" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return Array.isArray(json.exhibitions) ? json.exhibitions : [];
+  } catch (err) {
+    console.warn("[data] 전시 데이터 없음 — 해당 영역을 건너뜁니다");
+    return [];
+  }
+}
+
 async function main() {
   setupAiForm();
 
@@ -726,6 +902,7 @@ async function main() {
   state.raw = data;
   state.spots = data.spots;
   state.datasets = Array.isArray(data.datasets) ? data.datasets : [];
+  state.exhibitions = await loadExhibitions();
   state.themes = Array.isArray(data.themes)
     ? data.themes
     : [...new Set(state.spots.map((s) => s.theme).filter(Boolean))];
@@ -734,7 +911,9 @@ async function main() {
   renderSpotList();
   renderPersonaChips();
   renderFaq();
+  renderExhibitions();
   renderDatasets();
+  renderQuality();
 
   document.getElementById("nearby-btn").addEventListener("click", requestLocation);
 

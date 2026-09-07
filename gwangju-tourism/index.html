@@ -64,14 +64,28 @@
   </aside>
 </main>
 
-<section class="datasets" aria-labelledby="datasets-heading">
-  <div class="datasets-inner">
+<section id="exhibition-band" class="band" hidden>
+  <div class="band-inner">
+    <h2>지금 광주에서</h2>
+    <p class="band-lead">광주관광공사 주관전시회 일정입니다. 전시를 보러 가는 김에 근처 해설 거점도 함께 확인하세요.</p>
+    <div id="exhibition-list" class="exhibition-list"></div>
+  </div>
+</section>
+
+<section class="band band-alt" aria-labelledby="datasets-heading">
+  <div class="band-inner">
     <h2 id="datasets-heading">활용한 공공데이터</h2>
-    <p class="datasets-lead">
+    <p class="band-lead">
       이 서비스는 광주광역시관광공사가 개방한 데이터를 현장에서 쓸 수 있는 형태로 재구성한 것입니다.
       각 데이터가 서비스의 어느 기능을 구동하는지 아래에 밝힙니다.
     </p>
     <div id="dataset-list" class="dataset-list"></div>
+
+    <div id="quality-block" class="quality-block" hidden>
+      <h3 id="quality-heading">데이터 검증 기록</h3>
+      <p id="quality-note" class="band-lead"></p>
+      <div id="quality-list" class="quality-list"></div>
+    </div>
   </div>
 </section>
 

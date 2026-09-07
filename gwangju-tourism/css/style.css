@@ -482,32 +482,190 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* ---------- 활용한 공공데이터 ---------- */
+/* ---------- 하단 밴드 공통 ---------- */
 
-.datasets {
+.band {
   border-top: 1px solid var(--line);
   background: var(--surface);
   margin-top: 8px;
 }
 
-.datasets-inner {
+.band-alt {
+  background: var(--surface-sunk);
+}
+
+.band-inner {
   max-width: 1440px;
   margin: 0 auto;
   padding: 32px 20px 36px;
 }
 
-.datasets h2 {
+.band h2 {
   margin: 0 0 6px;
   font-size: 17px;
   font-weight: 700;
 }
 
-.datasets-lead {
+.band-lead {
   margin: 0 0 20px;
   font-size: 13.5px;
   color: var(--text-mid);
-  max-width: 62ch;
+  max-width: 66ch;
   line-height: 1.65;
+}
+
+/* ---------- 지금 광주에서 (전시) ---------- */
+
+.exhibition-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.exhibition-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 15px 17px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.exhibition-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.exhibition-period {
+  font-size: 12px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.exhibition-name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.exhibition-venue {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-mid);
+}
+
+.exhibition-facts {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.exhibition-site {
+  font-size: 12.5px;
+  color: var(--primary);
+  margin-top: 2px;
+}
+
+.phase-ongoing {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.phase-upcoming {
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.linkish {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---------- 데이터 검증 기록 ---------- */
+
+.quality-block {
+  margin-top: 32px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+
+.quality-block h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.quality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quality-item {
+  border-left: 2px solid var(--line-strong);
+  padding: 2px 0 2px 14px;
+  max-width: 78ch;
+}
+
+.quality-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.quality-dataset {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.quality-affected {
+  font-size: 12px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.kind-정정 {
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.kind-보완 {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.quality-issue {
+  margin: 0 0 3px;
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
+.quality-action {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
 }
 
 .dataset-list {
