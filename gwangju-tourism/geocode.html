@@ -1,0 +1,294 @@
+<title>좌표 채우기 도구 — 광주 ON AIR</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root {
+    --bg: #f4f5f7; --surface: #fff; --line: #d8dce2; --line-strong: #b9c0c9;
+    --text: #16191d; --text-mid: #4a515a; --text-soft: #6d757f;
+    --primary: #1b5fa8; --primary-dark: #12497f;
+    --ok: #1f6b45; --ok-soft: #e3f0e9;
+    --warn: #8a5a06; --warn-soft: #fbf0da;
+    --bad: #9c2f1c; --bad-soft: #f8e6e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --surface: #1c2026; --line: #333942; --line-strong: #48505b;
+      --text: #e8eaed; --text-mid: #b3b9c2; --text-soft: #8b929c;
+      --primary: #6ea8de; --primary-dark: #8fc0ef;
+      --ok: #7fbf9f; --ok-soft: #1b2a23;
+      --warn: #d8ab55; --warn-soft: #2c2618;
+      --bad: #e08a76; --bad-soft: #31201c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-size: 15px; line-height: 1.65;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 21px; margin: 0 0 6px; }
+  .lede { margin: 0 0 24px; color: var(--text-soft); font-size: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
+  }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  ol { margin: 0; padding-left: 20px; font-size: 14px; color: var(--text-mid); }
+  ol li { margin-bottom: 6px; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 0 20px; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    background: var(--primary); border: 1px solid var(--primary); color: #fff;
+  }
+  .btn:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn-plain { background: var(--surface); border-color: var(--line-strong); color: var(--text); }
+  .btn-plain:hover { background: var(--surface); border-color: var(--primary); color: var(--primary); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #status { margin: 12px 0 0; font-size: 13.5px; color: var(--text-mid); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+  th {
+    text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-soft); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  }
+  .t-ok { background: var(--ok-soft); color: var(--ok); }
+  .t-warn { background: var(--warn-soft); color: var(--warn); }
+  .t-bad { background: var(--bad-soft); color: var(--bad); }
+  .t-idle { background: var(--bg); color: var(--text-soft); }
+  .coords { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+  textarea {
+    width: 100%; min-height: 220px; margin-top: 12px; padding: 12px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px;
+    border: 1px solid var(--line-strong); border-radius: 8px;
+    background: var(--bg); color: var(--text); resize: vertical;
+  }
+  .hidden { display: none; }
+  .note { font-size: 13px; color: var(--text-soft); margin: 10px 0 0; line-height: 1.6; }
+</style>
+
+<div class="wrap">
+  <h1>좌표 채우기 도구</h1>
+  <p class="lede">
+    문화관광해설 거점의 도로명주소를 위도·경도로 바꿉니다.
+    카카오맵 JavaScript 키만 사용하므로 별도의 REST API 키나 프로그램 설치가 필요 없습니다.
+  </p>
+
+  <div class="card">
+    <h2>사용법</h2>
+    <ol>
+      <li>아래 <strong>좌표 채우기</strong> 버튼을 누릅니다.</li>
+      <li>표에서 <span class="tag t-warn">확인 필요</span> 또는 <span class="tag t-bad">실패</span> 항목이 있는지 봅니다.</li>
+      <li><strong>결과 전체 복사</strong>를 누릅니다.</li>
+      <li>GitHub에서 <code>data/places.json</code> 을 열어 연필 아이콘을 누르고, 전체 선택 후 붙여넣고 Commit 합니다.</li>
+    </ol>
+    <p class="note">
+      원본 데이터가 갱신되면 이 페이지를 다시 열어 같은 과정을 반복하면 됩니다.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="run" class="btn" type="button">좌표 채우기</button>
+      <button id="copy" class="btn btn-plain hidden" type="button">결과 전체 복사</button>
+    </div>
+    <p id="status">준비됨</p>
+    <div id="table-wrap"></div>
+  </div>
+
+  <div id="output-card" class="card hidden">
+    <h2>붙여넣을 내용</h2>
+    <p class="note">아래 내용을 <code>data/places.json</code> 전체와 바꿔치기 하세요.</p>
+    <textarea id="output" readonly></textarea>
+  </div>
+</div>
+
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=91c073489a8d4aaf847cf49ef9bbb679&autoload=false&libraries=services"></script>
+<script>
+"use strict";
+
+// 광주 행정경계 대략값. 결과가 이 밖으로 나오면 다른 지역 주소를 잡은 것이다.
+var BOUNDS = { minLat: 35.0, maxLat: 35.32, minLng: 126.6, maxLng: 127.1 };
+var DELAY_MS = 200;
+
+var data = null;
+var rows = [];
+
+function $(id) { return document.getElementById(id); }
+function setStatus(text) { $("status").textContent = text; }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+function inGwangju(lat, lng) {
+  return lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat && lng >= BOUNDS.minLng && lng <= BOUNDS.maxLng;
+}
+
+// 도로명주소 검색. 실패하면 장소명 키워드 검색으로 한 번 더 시도한다.
+// (원본 주소에 띄어쓰기가 빠진 경우 등에서 주소 검색만으로는 못 찾는다.)
+function searchAddress(geocoder, address) {
+  return new Promise(function (resolve) {
+    if (!address) { resolve(null); return; }
+    geocoder.addressSearch(address, function (result, status) {
+      if (status === kakao.maps.services.Status.OK && result[0]) {
+        resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), via: "주소" });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function searchKeyword(places, keyword) {
+  return new Promise(function (resolve) {
+    if (!keyword) { resolve(null); return; }
+    places.keywordSearch(keyword, function (result, status) {
+      if (status === kakao.maps.services.Status.OK && result[0]) {
+        resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), via: "장소명" });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function renderTable() {
+  var wrap = $("table-wrap");
+  wrap.innerHTML = "";
+  if (!rows.length) return;
+
+  var table = document.createElement("table");
+  table.innerHTML =
+    "<thead><tr><th>거점</th><th>상태</th><th>좌표</th><th>경로</th></tr></thead>";
+
+  var tbody = document.createElement("tbody");
+  rows.forEach(function (r) {
+    var tr = document.createElement("tr");
+
+    var name = document.createElement("td");
+    name.textContent = r.name;
+    tr.appendChild(name);
+
+    var st = document.createElement("td");
+    var tag = document.createElement("span");
+    tag.className = "tag " + r.tagClass;
+    tag.textContent = r.tagText;
+    st.appendChild(tag);
+    tr.appendChild(st);
+
+    var co = document.createElement("td");
+    co.className = "coords";
+    co.textContent = r.lat ? r.lat.toFixed(6) + ", " + r.lng.toFixed(6) : "—";
+    tr.appendChild(co);
+
+    var via = document.createElement("td");
+    via.textContent = r.via || "—";
+    tr.appendChild(via);
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+}
+
+async function run() {
+  var btn = $("run");
+  btn.disabled = true;
+  rows = [];
+  setStatus("데이터를 불러오는 중…");
+
+  try {
+    var res = await fetch("data/places.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data = await res.json();
+  } catch (err) {
+    setStatus("data/places.json 을 불러오지 못했습니다: " + err.message);
+    btn.disabled = false;
+    return;
+  }
+
+  var geocoder = new kakao.maps.services.Geocoder();
+  var places = new kakao.maps.services.Places();
+
+  var done = 0, failed = 0, suspect = 0, skipped = 0;
+
+  for (var i = 0; i < data.spots.length; i++) {
+    var spot = data.spots[i];
+    setStatus("검색 중… (" + (i + 1) + "/" + data.spots.length + ") " + spot.name);
+
+    if (typeof spot.lat === "number" && typeof spot.lng === "number") {
+      skipped++;
+      rows.push({ name: spot.name, tagClass: "t-idle", tagText: "이미 있음", lat: spot.lat, lng: spot.lng, via: "기존" });
+      renderTable();
+      continue;
+    }
+
+    var hit = await searchAddress(geocoder, spot.address);
+    if (!hit) hit = await searchKeyword(places, spot.name + " 광주");
+
+    if (!hit) {
+      failed++;
+      rows.push({ name: spot.name, tagClass: "t-bad", tagText: "실패", lat: null, lng: null, via: null });
+    } else {
+      spot.lat = hit.lat;
+      spot.lng = hit.lng;
+      if (inGwangju(hit.lat, hit.lng)) {
+        done++;
+        rows.push({ name: spot.name, tagClass: "t-ok", tagText: "성공", lat: hit.lat, lng: hit.lng, via: hit.via });
+      } else {
+        suspect++;
+        rows.push({ name: spot.name, tagClass: "t-warn", tagText: "확인 필요", lat: hit.lat, lng: hit.lng, via: hit.via });
+      }
+    }
+
+    renderTable();
+    await sleep(DELAY_MS);
+  }
+
+  var summary = "완료 — 새로 채움 " + done + "곳";
+  if (skipped) summary += ", 기존 " + skipped + "곳";
+  if (suspect) summary += ", 확인 필요 " + suspect + "곳";
+  if (failed) summary += ", 실패 " + failed + "곳";
+  if (suspect || failed) summary += " · 해당 항목은 카카오맵에서 직접 찾아 값을 고쳐 주세요.";
+  setStatus(summary);
+
+  $("output").value = JSON.stringify(data, null, 2) + "\n";
+  $("output-card").classList.remove("hidden");
+  $("copy").classList.remove("hidden");
+  btn.disabled = false;
+}
+
+$("copy").addEventListener("click", async function () {
+  var btn = $("copy");
+  var text = $("output").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = "복사됨";
+  } catch (err) {
+    $("output").select();
+    btn.textContent = "직접 복사하세요";
+  }
+  setTimeout(function () { btn.textContent = "결과 전체 복사"; }, 2000);
+});
+
+if (typeof kakao === "undefined" || !kakao.maps) {
+  setStatus("카카오맵을 불러오지 못했습니다. 카카오 개발자 콘솔의 [플랫폼 > Web]에 현재 도메인이 등록돼 있는지 확인하세요.");
+  $("run").disabled = true;
+} else {
+  kakao.maps.load(function () {
+    $("run").addEventListener("click", run);
+    setStatus("준비됨 — 좌표 채우기 버튼을 누르세요.");
+  });
+}
+</script>
