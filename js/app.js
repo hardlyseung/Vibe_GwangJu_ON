@@ -419,13 +419,20 @@ function renderDetail(spot) {
 
 async function copyShareLink(spot, button) {
   const link = shareUrlFor(spot);
-  const original = button.textContent;
+
+  // 연타하면 두 번째 호출이 "복사됨"을 원래 라벨로 기억해, 버튼이 그 상태로 굳는다.
+  // 원래 라벨은 버튼에 한 번만 새겨두고, 앞선 되돌리기 타이머는 취소한다.
+  if (!button.dataset.label) button.dataset.label = button.textContent;
+  if (button.dataset.restoreTimer) clearTimeout(Number(button.dataset.restoreTimer));
 
   const done = (label) => {
     button.textContent = label;
-    setTimeout(() => {
-      button.textContent = original;
-    }, 1800);
+    button.dataset.restoreTimer = String(
+      setTimeout(() => {
+        button.textContent = button.dataset.label;
+        delete button.dataset.restoreTimer;
+      }, 1800)
+    );
   };
 
   // clipboard API는 HTTPS(또는 localhost)에서만 동작한다. 실패하면 주소를 직접 보여준다.
