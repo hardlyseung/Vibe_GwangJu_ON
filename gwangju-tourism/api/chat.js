@@ -6,7 +6,18 @@
 // 정적 require 를 쓴다. fs.readFileSync(process.cwd() + ...) 는 번들러가 추적하지 못해
 // 배포된 함수에 데이터 파일이 빠지고, 모든 질문이 500으로 떨어진다.
 // require 는 빌드 시 추적되고 결과가 캐시되므로 별도 캐시 변수도 필요 없다.
-const placesData = require("../data/places.json");
+//
+// 다만 require 는 모듈 로드 시점에 실행되므로, JSON 이 깨져 있으면 핸들러의 try/catch 밖에서
+// 함수 자체가 부팅에 실패한다. 데이터는 GitHub 웹 편집기로 손편집하는 것이 정식 절차라
+// 문법 오류가 현실적인 경로다. 여기서 잡아 두고 요청 시점에 안내 응답으로 바꾼다.
+let placesData = null;
+let placesLoadError = null;
+try {
+  placesData = require("../data/places.json");
+} catch (err) {
+  placesLoadError = err;
+  console.error("[chat] places.json 을 읽을 수 없습니다", err);
+}
 
 const MODEL = "gemini-2.5-flash";
 const MAX_QUESTION_LENGTH = 200;
@@ -29,22 +40,44 @@ const LANGUAGE_INSTRUCTIONS = {
   zh: "请用中文回答。以下资料为韩语，请忠实翻译，不要添加资料中没有的事实。",
 };
 
-// 자료로 답할 수 없을 때 쓰는 문장. 언어별로 준비해 두지 않으면 모델이 임의로 지어낸다.
-function refusalText(place, language) {
-  const phone = place.phone || "";
-  switch (language) {
-    case "en":
-      return `This information is not confirmed in the official tourism materials. Please contact the site directly at ${phone}.`;
-    case "ja":
-      return `この内容は公式観光資料では確認できませんでした。現地(${phone})までお問い合わせください。`;
-    case "zh":
-      return `该内容未能在官方旅游资料中得到确认。请拨打现场电话(${phone})咨询。`;
-    default:
-      return `해당 내용은 공식 관광 자료에서 확인되지 않았습니다. 현장 문의(${phone})로 확인해 주세요.`;
-  }
+// 답하지 못하는 이유는 세 가지이고, 서로 다른 사실을 뜻한다.
+//   not_found : 자료에 그 내용이 없다
+//   blocked   : 자료에 있을 수도 있으나 안전 필터가 생성을 막았다
+//   too_long  : 자료도 있고 차단도 아니지만 토큰 한도로 본문이 비었다
+// 셋을 같은 문구로 뭉치면 사용자에게 틀린 이유를 말하게 되고,
+// too_long 은 생성 설정이 잘못됐다는 신호인데 그것도 묻혀 버린다.
+// 언어별로 미리 써 두지 않으면 모델이 이 문장마저 지어낸다.
+const FALLBACK_MESSAGES = {
+  not_found: {
+    ko: (p) => `해당 내용은 공식 관광 자료에서 확인되지 않았습니다. 현장 문의(${p})로 확인해 주세요.`,
+    en: (p) => `This information is not confirmed in the official tourism materials. Please contact the site directly at ${p}.`,
+    ja: (p) => `この内容は公式観光資料では確認できませんでした。現地(${p})までお問い合わせください。`,
+    zh: (p) => `该内容未能在官方旅游资料中得到确认。请拨打现场电话(${p})咨询。`,
+  },
+  blocked: {
+    ko: (p) => `이 질문에는 자동 해설을 제공하기 어렵습니다. 현장 문화관광해설사(${p})에게 문의해 주세요.`,
+    en: (p) => `An automated explanation cannot be provided for this question. Please ask the on-site interpreter at ${p}.`,
+    ja: (p) => `この質問には自動解説を提供できません。現地の文化観光解説士(${p})にお問い合わせください。`,
+    zh: (p) => `无法为该问题提供自动讲解。请咨询现场文化观光讲解员(${p})。`,
+  },
+  too_long: {
+    ko: () => "답변이 길어져 생성하지 못했습니다. 질문을 더 짧게 나눠서 물어봐 주세요.",
+    en: () => "The answer grew too long to generate. Please ask a shorter, more specific question.",
+    ja: () => "回答が長くなりすぎて生成できませんでした。もう少し短く質問してください。",
+    zh: () => "回答过长，无法生成。请把问题拆得更简短一些。",
+  },
+};
+
+function fallbackText(kind, place, language) {
+  const table = FALLBACK_MESSAGES[kind] || FALLBACK_MESSAGES.not_found;
+  const build = table[language] || table.ko;
+  return build((place && place.phone) || "관리기관");
 }
 
 function loadPlaces() {
+  if (!placesData || !Array.isArray(placesData.spots)) {
+    throw placesLoadError || new Error("places.json 의 형식이 올바르지 않습니다");
+  }
   return placesData.spots;
 }
 
@@ -85,7 +118,7 @@ function buildGroundingBlock(place) {
 function buildSystemPrompt(place, persona, grounding, language) {
   const personaLine = PERSONA_INSTRUCTIONS[pickKey(PERSONA_INSTRUCTIONS, persona, "general")];
   const languageLine = LANGUAGE_INSTRUCTIONS[pickKey(LANGUAGE_INSTRUCTIONS, language, "ko")];
-  const refusal = refusalText(place, language);
+  const refusal = fallbackText("not_found", place, language);
 
   return `당신은 "광주 ON AIR"의 AI 문화관광해설사입니다.
 관광객은 지금 [${place.name}]에 대해 묻고 있습니다.
@@ -203,12 +236,12 @@ module.exports = async (req, res) => {
   }
 
   const source = { name: place.source_name, date: place.source_date };
-  const refusal = refusalText(place, language);
+  const notFound = fallbackText("not_found", place, language);
   const grounding = buildGroundingBlock(place);
 
   // 근거 자료가 이름·주소 수준뿐이면 모델을 부를 필요도 없다. 할당량도 아끼고 환각 여지도 없앤다.
   if (!isFilled(place.summary) && !isFilled(place.history_details) && !isFilled(place.visit_tips)) {
-    sendJson(res, 200, { answer: refusal, grounded: false, source });
+    sendJson(res, 200, { answer: notFound, reason: "not_found", grounded: false, source });
     return;
   }
 
@@ -268,7 +301,12 @@ module.exports = async (req, res) => {
 
     if (blockReason || (finishReason && blockedFinish.includes(finishReason))) {
       console.warn(`[chat] 차단됨 place=${place.name} reason=${blockReason || finishReason}`);
-      sendJson(res, 200, { answer: refusal, blocked: true, source });
+      sendJson(res, 200, {
+        answer: fallbackText("blocked", place, language),
+        reason: "blocked",
+        blocked: true,
+        source,
+      });
       return;
     }
 
@@ -278,9 +316,22 @@ module.exports = async (req, res) => {
       Array.isArray(candidate.content.parts) &&
       candidate.content.parts.map((p) => p.text || "").join("").trim();
 
+    // 본문이 비었는데 사유가 MAX_TOKENS 이면 자료가 없어서가 아니라 생성 예산이 모자란 것이다.
+    // 이걸 "자료에 없음"으로 뭉치면 생성 설정이 잘못됐다는 신호가 그대로 묻힌다.
+    if (!answer && finishReason === "MAX_TOKENS") {
+      console.error(`[chat] 토큰 한도로 본문 없음 place=${place.name} — 생성 설정을 확인할 것`);
+      sendJson(res, 200, {
+        answer: fallbackText("too_long", place, language),
+        reason: "too_long",
+        grounded: false,
+        source,
+      });
+      return;
+    }
+
     if (!answer) {
       console.warn(`[chat] 빈 응답 place=${place.name} finishReason=${finishReason}`);
-      sendJson(res, 200, { answer: refusal, grounded: false, source });
+      sendJson(res, 200, { answer: notFound, reason: "not_found", grounded: false, source });
       return;
     }
 

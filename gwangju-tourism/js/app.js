@@ -947,12 +947,16 @@ async function askAi() {
     try {
       payload = await res.json();
     } catch (parseErr) {
+      if (state.selected !== askedFor) return;
       answerBox.textContent =
         res.status === 404
           ? "AI 기능은 배포된 주소에서만 동작합니다. (정적 파일만 여는 환경에서는 /api/chat 이 없습니다)"
           : "서버 응답을 해석할 수 없습니다. 잠시 후 다시 시도해 주세요.";
       return;
     }
+
+    // 본문을 읽는 사이에도 거점이 바뀔 수 있다. 화면에 쓰기 직전에 한 번 더 확인한다.
+    if (state.selected !== askedFor) return;
 
     if (!res.ok) {
       answerBox.textContent = errorMessageFor(res.status, payload);
@@ -970,8 +974,10 @@ async function askAi() {
     answerBox.textContent = parts.join("");
 
     // 자료로 답하지 못한 경우에는 사람에게 넘긴다. AI가 멈추는 지점이 서비스가 멈추는 지점이 아니다.
+    // 질문을 보낸 거점을 명시적으로 넘긴다. state.selected 를 읽으면 늦게 도착한 답변에
+    // 엉뚱한 거점의 전화번호가 붙을 수 있다.
     if (payload.grounded === false || payload.blocked) {
-      showHandoff();
+      showHandoff(askedFor);
     }
   } catch (err) {
     if (err.name === "AbortError") {
@@ -996,9 +1002,9 @@ function clearHandoff() {
 }
 
 // AI가 답을 못 낼 때 현장 해설사로 연결하는 안내를 답변 아래에 붙인다.
-function showHandoff() {
+// 대상 거점은 호출자가 넘긴다 — 답변이 늦게 도착하는 동안 선택이 바뀔 수 있기 때문이다.
+function showHandoff(spot) {
   const answerBox = document.getElementById("ai-answer");
-  const spot = state.selected;
   if (!spot) return;
 
   clearHandoff();
