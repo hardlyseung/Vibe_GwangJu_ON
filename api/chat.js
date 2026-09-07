@@ -19,7 +19,11 @@ try {
   console.error("[chat] places.json 을 읽을 수 없습니다", err);
 }
 
-const MODEL = "gemini-2.5-flash";
+// 모델명은 키가 속한 계정·프로젝트에 따라 제공 여부가 다르다. 없는 이름으로 부르면
+// 인증 오류가 아니라 404(경로 없음)가 돌아오므로, 후보를 순서대로 시도한다.
+// 성공한 이름은 워밍된 함수 인스턴스에 기억해 두어 다음 요청부터는 한 번에 맞춘다.
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+let resolvedModel = null;
 const MAX_QUESTION_LENGTH = 200;
 // Vercel Hobby 함수는 오래 걸리면 플랫폼이 먼저 끊는다.
 // 그 전에 우리가 끊어야 사용자에게 깔끔한 메시지를 돌려줄 수 있다.
@@ -181,6 +185,52 @@ function isRateLimited(req) {
   return entry.count > RATE_MAX_PER_WINDOW;
 }
 
+// 모델 후보를 순서대로 호출한다. 404 는 "이 키에 그 모델 경로가 없다"는 뜻이라 다음 후보로 넘어가고,
+// 그 외 응답(성공이든 429/403이든)은 원인이 모델명이 아니므로 그대로 돌려준다.
+// AbortController 는 후보 전체에 공유된다 — 404 는 즉시 돌아오므로 총 예산을 넘기지 않는다.
+async function callGemini(apiKey, body, signal) {
+  const ordered = resolvedModel
+    ? [resolvedModel].concat(MODEL_CANDIDATES.filter((m) => m !== resolvedModel))
+    : MODEL_CANDIDATES;
+
+  let lastNotFound = null;
+
+  for (const model of ordered) {
+    const upstream = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body,
+        signal,
+      }
+    );
+
+    if (upstream.status === 404) {
+      const detail = await upstream.text().catch(() => "");
+      console.warn(`[chat] 모델 ${model} 사용 불가(404): ${detail.slice(0, 300)}`);
+      // 기억해 둔 이름이 더 이상 유효하지 않은 경우이므로 캐시를 비운다.
+      if (resolvedModel === model) resolvedModel = null;
+      lastNotFound = upstream;
+      continue;
+    }
+
+    if (upstream.ok) {
+      if (resolvedModel !== model) {
+        console.log(`[chat] 사용 모델 확정: ${model}`);
+        resolvedModel = model;
+      }
+    }
+    return upstream;
+  }
+
+  // 후보가 전부 404. 호출부가 상태코드를 읽어 안내 문구를 만든다.
+  return lastNotFound;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "POST 요청만 지원합니다." });
@@ -249,27 +299,18 @@ module.exports = async (req, res) => {
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   try {
-    const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: question }] }],
-          systemInstruction: {
-            parts: [{ text: buildSystemPrompt(place, persona, grounding, language) }],
-          },
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1200,
-          },
-        }),
-        signal: controller.signal,
-      }
-    );
+    const requestBody = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: question }] }],
+      systemInstruction: {
+        parts: [{ text: buildSystemPrompt(place, persona, grounding, language) }],
+      },
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1200,
+      },
+    });
+
+    const upstream = await callGemini(apiKey, requestBody, controller.signal);
 
     if (!upstream.ok) {
       // 업스트림 원문에는 키·할당량 정보가 섞일 수 있으므로 로그에만 남기고 클라이언트에는 요약만 준다.
@@ -280,6 +321,12 @@ module.exports = async (req, res) => {
         sendJson(res, 429, { error: "AI 이용량 한도에 도달했습니다. 잠시 후 다시 시도해 주세요." });
       } else if (upstream.status === 400 || upstream.status === 401 || upstream.status === 403) {
         sendJson(res, 500, { error: "AI 키 설정에 문제가 있습니다. 키 값과 재배포 여부를 확인해 주세요." });
+      } else if (upstream.status === 404) {
+        // 후보 모델을 모두 시도했는데 전부 없다. 키는 유효하지만 이 계정이 쓸 수 있는 모델명이
+        // 후보 목록에 없다는 뜻이라, 키를 다시 확인하라고 안내하면 잘못된 곳을 뒤지게 된다.
+        sendJson(res, 502, {
+          error: "AI 모델을 사용할 수 없습니다. 아래 ‘빠른 안내’는 그대로 이용하실 수 있습니다. (업스트림 상태 404)",
+        });
       } else {
         // 원문은 안 보내되, 상태코드는 숫자뿐이라 노출해도 안전하고 원인 추적에 필수적이다.
         sendJson(res, 502, { error: `AI 응답을 생성하지 못했습니다. (업스트림 상태 ${upstream.status})` });
