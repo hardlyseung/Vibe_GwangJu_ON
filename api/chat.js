@@ -210,8 +210,10 @@ async function callGemini(apiKey, body, signal) {
     );
 
     if (upstream.status === 404) {
-      const detail = await upstream.text().catch(() => "");
-      console.warn(`[chat] 모델 ${model} 사용 불가(404): ${detail.slice(0, 300)}`);
+      // 본문은 여기서 읽지 않는다 — 호출부가 실패를 최종 판단한 뒤 그 Response의 본문을
+      // 딱 한 번만 읽는다. 스트림은 한 번만 읽을 수 있어, 여기서 먼저 읽으면 호출부의
+      // 읽기가 빈 문자열로 조용히 실패한다.
+      console.warn(`[chat] 모델 ${model} 사용 불가(404)`);
       // 기억해 둔 이름이 더 이상 유효하지 않은 경우이므로 캐시를 비운다.
       if (resolvedModel === model) resolvedModel = null;
       lastNotFound = upstream;

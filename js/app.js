@@ -884,12 +884,14 @@ function errorMessageFor(status, payload) {
     case 429:
       return "지금 AI 이용량이 많습니다. 잠시 후 다시 시도해 주세요.";
     case 500:
-      return payload && payload.error
+      return typeof (payload && payload.error) === "string"
         ? payload.error
         : "서버에서 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     case 502:
     case 503:
-      return payload && payload.error
+      // 우리 함수까지 못 가고 플랫폼 단에서 막힌 응답은 error가 문자열이 아니거나 없다.
+      // 그런 경우까지 화면에 [object Object] 같은 값이 나가지 않도록 문자열일 때만 쓴다.
+      return typeof (payload && payload.error) === "string"
         ? payload.error
         : "AI 서비스에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
     case 504:
