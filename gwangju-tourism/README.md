@@ -1,62 +1,123 @@
-# 광주 ON AIR (가제) — 2026 광주관광공사 노코드·바이브코딩 공모전 프로토타입
+# 광주 ON AIR
 
-## 지금 상태
-지도 + 테마 필터 + 관광지 목록 + 통계 차트 + 규칙 기반 FAQ + **AI 문화관광해설(Direct-Context, No-RAG)** 뼈대가 잡혀 있습니다.
+> 지도를 누르면 광주의 이야기가 시작됩니다
 
-- `data/places.json`: **광주광역시관광공사_문화관광해설사 현황(수정일 2026-06-09)** 실제 18곳 데이터 반영 완료
-  (이름/주소/전화번호/관리기관은 실데이터, `history_details`/`visit_tips`/`operating_hours`/`admission`/`parking`은 아직 `TODO`)
-- 좌표(lat/lng)는 원본 CSV에 없어서 `null` — `scripts/geocode.js`로 채워야 함 (아래 참고)
-- 카카오맵 JavaScript 키 적용 완료
+2026 광주관광공사 노코드·바이브코딩 AI 활용 데이터 공모전 출품작.
+광주 문화관광해설 거점 18곳을 지도에서 찾고, 공식 자료에 근거한 AI 해설을 듣고, 현장 해설사로 연결되는 웹서비스.
 
-프론트는 순수 HTML/CSS/JS(빌드 없음)를 유지하고, AI 호출만 서버리스 함수 하나(`api/chat.js`)로 처리합니다.
-→ **배포는 GitHub Pages가 아니라 Vercel**을 사용해야 합니다 (GitHub Pages는 서버리스 함수를 못 돌림).
+**활용 데이터**: 광주광역시관광공사 문화관광해설사 현황 (기준일 2026-06-09)
 
-## 1. 좌표 채우기 (가장 먼저 할 일)
-1. 카카오 개발자 콘솔 → 내 애플리케이션 → 앱 키 → **REST API 키**를 발급 (JavaScript 키와 다름, 같은 앱에서 같이 발급됨)
-2. 아래 명령 실행 (Node 18+ 필요):
-   ```
-   cd gwangju-tourism
-   KAKAO_REST_KEY=발급받은_REST_API_키 node scripts/geocode.js
-   ```
-3. `data/places.json`의 모든 `lat`/`lng`가 채워졌는지 확인 (실패 항목은 로그에 표시됨 → 주소 재확인)
+---
 
-## 2. 로컬 실행
-1. 카카오 개발자 콘솔 → 플랫폼 → Web 플랫폼에 로컬 주소(`http://localhost:5500` 등)와 Vercel 배포 주소 등록
-   (지금 등록된 도메인이 없으면 지도가 안 뜨고 콘솔에 도메인 오류가 찍힘)
-2. `npm i -g vercel` 후 이 폴더(`gwangju-tourism/`)에서 `vercel dev` 실행
-   → 정적 파일 + `/api/chat` 함수가 함께 로컬에서 동작 (Live Server만 쓰면 AI 기능은 테스트 안 됨, 지도/FAQ는 가능)
+## 현재 상태
 
-## 3. Vercel 배포
-1. GitHub 레포를 Vercel에 연결, **Root Directory를 `gwangju-tourism`으로 지정**
-2. Vercel 프로젝트 → Settings → Environment Variables에 `GEMINI_API_KEY` 등록
-   - **반드시 [ai.google.com/aistudio](https://ai.google.com/aistudio)의 진짜 무료 티어 키를 사용하세요.**
-   - GCP 체험판(트라이얼) 크레딧에 연결된 키는 쓰지 마세요 — 크레딧은 보통 90일/소진 시 만료되는데,
-     공모전 조건상 서비스는 **2027.3.31까지 계속 접속 가능해야 합니다.** 크레딧 만료로 서비스가 끊기면 운영 조건 위반입니다.
-3. 배포 후 카카오 개발자 콘솔에 Vercel 도메인을 Web 플랫폼으로 추가
+| 영역 | 상태 |
+|---|---|
+| 코드 (지도·목록·필터·상세·AI·FAQ) | 작성 완료, 브라우저 검증 전 |
+| 거점 기본 정보 (이름·주소·전화·기관) | 18곳 완료 (CSV 실데이터) |
+| 거점 해설 내용 (연혁·관람팁·운영정보) | **미작성 — `TODO` 88개** |
+| 좌표 (lat/lng) | **0 / 18** |
+| 카카오맵 연동 | JS 키 적용됨, 카카오맵 제품 활성화 필요 |
+| AI 연동 | 코드 완료, `GEMINI_API_KEY` 미등록 |
+| 배포 | 미진행 |
 
-## 남은 TODO (우선순위 순)
-- [ ] 좌표 채우기 (`scripts/geocode.js` 실행) ← 이거 없으면 마커가 하나도 안 뜸
-- [ ] `data/places.json`의 `TODO` 표시된 `history_details`/`visit_tips`/`operating_hours`/`admission`/`parking`을
-      **광주관광공사 관광 가이드북 PDF**(공사 자체 콘텐츠) 기반으로 채우기
-      → 데이터 활용성 심사(30점)에서 "공사 데이터" 비중을 높이는 핵심 작업
-- [ ] `GEMINI_API_KEY` 발급 및 Vercel 환경변수 등록, AI 답변 실제 테스트 (일반/가족/역사 3톤 + 근거 없는 질문 거절 확인)
-- [ ] `js/app.js`의 `renderStatChart()` 예시 숫자를 PDF 통계로 교체
-- [ ] Vercel 배포, 모바일 실기기 테스트
-- [ ] 제출용 스크린샷/발표자료, 데이터 출처 명시
+---
 
-## 알아둘 것
-- 원본 CSV의 '소재지' 컬럼은 7~11번(충장사~광주역사민속박물관) 행에서 '남구'로 잘못 표기돼 있었음
-  → 도로명주소 기준(북구)으로 정정해서 반영함 (`data/places.json`의 `district_note` 참고)
-- 5·18 관련 두 곳(국립5.18민주묘지, 5.18자유공원)은 민감한 역사 서술이라 `history_details`를 비워둠.
-  반드시 공식 자료(국가보훈부·5.18기념재단 등)만 근거로, 검증된 내용만 채울 것.
+## 키가 필요한 작업 (한 번에 처리)
+
+아래 5개는 전부 외부 콘솔 작업이라 몰아서 하는 편이 낫다. 순서대로 진행할 것.
+
+### 1. 카카오맵 제품 활성화
+카카오 개발자 콘솔 → 내 애플리케이션 → **제품 설정 → 카카오맵 → 사용 설정 ON**
+이게 꺼져 있으면 좌표 변환이 `403 disabled OPEN_MAP_AND_LOCAL service` 로 실패한다.
+
+### 2. 좌표 채우기
+콘솔 → 앱 키 → **REST API 키** 복사 후, 이 폴더에서 실행 (Node 18+):
+
+```powershell
+$env:KAKAO_REST_KEY="복사한_REST_API_키"
+node scripts/geocode.js
+```
+
+18곳 좌표가 `data/places.json` 에 채워진다.
+스크립트가 광주 경계 밖 좌표와 검색 실패 항목을 따로 알려주니, 그 항목만 카카오맵에서 직접 찾아 수동 입력한다.
+
+### 3. 도메인 등록
+콘솔 → **플랫폼 → Web** 에 접속할 주소를 등록한다. 등록 안 하면 지도가 안 뜬다.
+- 로컬 테스트 주소 (예: `http://localhost:3000`)
+- 배포 후 받은 Vercel 주소
+
+### 4. Gemini 키 발급
+[ai.google.com/aistudio](https://ai.google.com/aistudio) 에서 **무료 티어 API 키** 발급.
+
+> GCP 체험판 크레딧에 연결된 키는 쓰지 말 것. 크레딧이 만료되면 서비스가 끊기는데,
+> 공모전 조건은 **2027-03-31까지 접속 가능한 상태 유지**라 운영 조건 위반이 된다.
+
+### 5. Vercel 배포
+1. vercel.com 가입 (GitHub 계정) → Add New Project → 이 레포 import
+2. **Root Directory 를 `gwangju-tourism` 으로 지정**
+3. Settings → Environment Variables 에 `GEMINI_API_KEY` 등록
+4. Deploy
+5. **환경변수를 나중에 추가했다면 반드시 Redeploy** — 안 하면 계속 키 없음 오류가 난다
+6. 배포 주소를 3번의 카카오 Web 플랫폼에 추가
+
+---
+
+## 로컬에서 확인하기
+
+```
+npm i -g vercel
+vercel dev
+```
+
+`vercel dev` 는 정적 파일과 `/api/chat` 함수를 함께 띄운다.
+Live Server 같은 정적 서버로 열면 지도·목록·FAQ는 동작하지만 AI는 "배포된 주소에서만 동작합니다" 안내가 뜬다 (의도된 동작).
+`index.html` 을 파일로 직접 열면(`file://`) 카카오맵 SDK가 동작하지 않는다.
+
+---
+
+## 남은 작업
+
+- [ ] **해설 내용 채우기 (`TODO` 88개)** — 가장 오래 걸리는 작업. 관광 가이드북 PDF 등 공식 자료 기반
+  - 이게 AI 답변의 유일한 근거 자료다. 비어 있으면 AI는 "확인되지 않았습니다"로만 답한다
+  - 5·18 관련 거점은 반드시 공식 자료만 사용
+- [ ] 위 "키가 필요한 작업" 1~5
+- [ ] 배포 후 실기기(폰) 검증
+- [ ] 제출용 스크린샷·발표자료
+
+---
+
+## 설계 메모
+
+**AI가 지어내지 않는 구조.** 벡터 DB나 RAG 없이, 선택한 거점의 공식 자료 전문을 그대로 프롬프트에 넣는다(Direct-Context). 18행짜리 데이터에 검색 계층을 얹을 이유가 없고, 검색 실패로 자료가 누락될 위험도 사라진다.
+`TODO` 로 남아 있는 필드는 프롬프트에서 아예 제외되므로, 미작성 내용이 근거 자료로 둔갑하지 않는다.
+
+**하나가 죽어도 서비스는 산다.** 지도(카카오)와 AI(Gemini)는 각각 독립적으로 실패할 수 있다.
+- 카카오 SDK 로드 실패 → 지도 자리에 원인 안내, 목록·상세·AI는 계속 동작
+- AI 실패·한도 초과·안전 필터 차단 → 규칙 기반 빠른 안내는 계속 동작
+- 좌표 없는 거점 → 목록에 표시하고, 길찾기는 주소 검색으로 대체
+
+**키 취급.**
+
+| 키 | 위치 | 비고 |
+|---|---|---|
+| 카카오 JavaScript 키 | `index.html` | 클라이언트 공개 전제. 도메인 제한으로 보호 |
+| 카카오 REST API 키 | 실행 시 환경변수 | 커밋 금지 |
+| `GEMINI_API_KEY` | Vercel 환경변수 | 커밋 금지. 브라우저로 나가지 않음 |
+
+---
 
 ## 파일 구조
+
 ```
 gwangju-tourism/
-├── index.html           # 페이지 레이아웃 (지도 + FAQ + AI 해설 패널)
-├── css/style.css         # 스타일
-├── js/app.js             # 지도/필터/차트/FAQ/AI 호출 로직
-├── data/places.json      # 실데이터 18곳 (TODO 필드 참고)
-├── scripts/geocode.js    # 주소 -> 좌표 변환 1회성 스크립트 (카카오 REST API 키 필요)
-└── api/chat.js           # Vercel 서버리스 함수 — Gemini 호출 + 환각 방지 가드레일 프롬프트
+├── index.html          # 화면 구조
+├── css/style.css       # 스타일 (다크모드 대응)
+├── js/app.js           # 지도·필터·목록·상세·AI 호출
+├── api/chat.js         # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
+├── data/places.json    # 거점 18곳 (해설 내용 TODO)
+├── scripts/geocode.js  # 주소 → 좌표 변환 (1회성)
+└── vercel.json         # 프레임워크 자동감지 비활성화
 ```
+
+> `vercel.json` 때문에 배포가 이상하면 이 파일은 지워도 된다. 자동감지에 맡기는 것이 기본 동작이다.
