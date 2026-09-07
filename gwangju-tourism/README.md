@@ -32,15 +32,21 @@
 이게 꺼져 있으면 좌표 변환이 `403 disabled OPEN_MAP_AND_LOCAL service` 로 실패한다.
 
 ### 2. 좌표 채우기
-콘솔 → 앱 키 → **REST API 키** 복사 후, 이 폴더에서 실행 (Node 18+):
+
+**권장 — 브라우저에서.** 배포한 뒤 `https://<배포주소>/geocode.html` 을 열고 버튼 한 번 누른다.
+카카오맵 JavaScript 키만 쓰므로 REST 키 발급도, Node 설치도 필요 없다.
+결과를 복사해 GitHub 웹 편집기로 `data/places.json` 에 붙여넣고 커밋하면 Vercel이 자동 재배포한다.
+주소 검색이 실패하면 장소명 키워드 검색으로 자동 재시도하며, 어느 경로로 찾았는지 표에 표시된다.
+
+**대안 — 로컬에서.** Node 18+ 와 카카오 **REST API 키**가 있다면:
 
 ```powershell
 $env:KAKAO_REST_KEY="복사한_REST_API_키"
 node scripts/geocode.js
 ```
 
-18곳 좌표가 `data/places.json` 에 채워진다.
-스크립트가 광주 경계 밖 좌표와 검색 실패 항목을 따로 알려주니, 그 항목만 카카오맵에서 직접 찾아 수동 입력한다.
+두 방법 모두 이미 좌표가 있는 항목은 건너뛰고, 광주 경계 밖 좌표와 검색 실패 항목을 따로 알려준다.
+그 항목만 카카오맵에서 직접 찾아 수동 입력한다.
 
 ### 3. 도메인 등록
 콘솔 → **플랫폼 → Web** 에 접속할 주소를 등록한다. 등록 안 하면 지도가 안 뜬다.
@@ -111,13 +117,18 @@ Live Server 같은 정적 서버로 열면 지도·목록·FAQ는 동작하지�
 
 ```
 gwangju-tourism/
-├── index.html          # 화면 구조
-├── css/style.css       # 스타일 (다크모드 대응)
-├── js/app.js           # 지도·필터·목록·상세·AI 호출
-├── api/chat.js         # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
-├── data/places.json    # 거점 18곳 (해설 내용 TODO)
-├── scripts/geocode.js  # 주소 → 좌표 변환 (1회성)
-└── vercel.json         # 프레임워크 자동감지 비활성화
+├── index.html                     # 화면 구조
+├── geocode.html                   # 좌표 채우기 도구 (브라우저에서 실행)
+├── css/style.css                  # 스타일 (다크모드 대응)
+├── js/app.js                      # 지도·필터·검색·상세·전시·AI 호출
+├── api/chat.js                    # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
+├── data/places.json               # 거점 18곳 + 데이터셋 선언 + 검증 기록 (해설 내용 TODO)
+├── data/exhibitions.json          # 전시회 (CSV 변환 전에는 빈 배열)
+├── scripts/geocode.js             # 주소 → 좌표 변환 (로컬 대안)
+├── scripts/convert-exhibitions.js # 전시회 CSV → JSON
+├── docs/METHODOLOGY.md            # AI 협업 개발 방법론
+├── CLAUDE.md                      # AI 도구용 작업 규칙
+└── vercel.json                    # 프레임워크 자동감지 비활성화
 ```
 
 > `vercel.json` 때문에 배포가 이상하면 이 파일은 지워도 된다. 자동감지에 맡기는 것이 기본 동작이다.

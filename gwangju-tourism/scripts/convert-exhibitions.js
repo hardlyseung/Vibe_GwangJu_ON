@@ -132,16 +132,18 @@ function toIsoDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
 
-  let m = raw.match(/(\d{4})[-.\/년\s]*(\d{1,2})[-.\/월\s]*(\d{1,2})/);
-  if (m) {
-    const [, y, mo, d] = m;
-    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  }
+  // 연·월·일이 모두 있어야 인정한다. 구분자를 필수로 두지 않으면 "2024-11" 같은 값이
+  // 역추적으로 월=1, 일=1 로 매칭돼 2024-01-01 이라는 없는 날짜가 조용히 만들어진다.
+  let m = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!m) m = raw.match(/^(\d{4})\s*[-.\/년]\s*(\d{1,2})\s*[-.\/월]\s*(\d{1,2})/);
+  if (!m) return null;
 
-  m = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
-  return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function toNumber(value) {

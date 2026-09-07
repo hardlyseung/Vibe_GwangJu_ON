@@ -632,6 +632,13 @@ body {
   font-weight: 600;
 }
 
+.phase-past,
+.phase-unknown {
+  background: var(--surface-sunk);
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
 .linkish {
   align-self: flex-start;
   margin-top: 4px;
@@ -792,6 +799,12 @@ body {
 .kind-보완 {
   background: var(--primary-soft);
   color: var(--primary);
+  font-weight: 600;
+}
+
+.kind-한계 {
+  background: var(--surface-sunk);
+  color: var(--text-mid);
   font-weight: 600;
 }
 

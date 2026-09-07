@@ -3,8 +3,10 @@
 // 환경변수 GEMINI_API_KEY 는 ai.google.com/aistudio 의 상시 무료 티어 키를 쓴다.
 // GCP 체험판 크레딧에 연결된 키는 크레딧 만료 시 서비스가 끊겨 공모전 운영 조건(2027-03-31까지 공개)을 위반한다.
 
-const fs = require("fs");
-const path = require("path");
+// 정적 require 를 쓴다. fs.readFileSync(process.cwd() + ...) 는 번들러가 추적하지 못해
+// 배포된 함수에 데이터 파일이 빠지고, 모든 질문이 500으로 떨어진다.
+// require 는 빌드 시 추적되고 결과가 캐시되므로 별도 캐시 변수도 필요 없다.
+const placesData = require("../data/places.json");
 
 const MODEL = "gemini-2.5-flash";
 const MAX_QUESTION_LENGTH = 200;
@@ -42,13 +44,16 @@ function refusalText(place, language) {
   }
 }
 
-let placesCache = null;
-
 function loadPlaces() {
-  if (placesCache) return placesCache;
-  const filePath = path.join(process.cwd(), "data", "places.json");
-  placesCache = JSON.parse(fs.readFileSync(filePath, "utf-8")).spots;
-  return placesCache;
+  return placesData.spots;
+}
+
+// 프로토타입 키("toString", "constructor" 등)가 통과하면 네이티브 함수 소스가
+// 시스템 프롬프트에 그대로 들어간다. 자체 속성만 인정한다.
+function pickKey(table, value, fallback) {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(table, value)
+    ? value
+    : fallback;
 }
 
 // places.json의 미작성 필드는 "TODO..." 문자열이다.
@@ -78,8 +83,8 @@ function buildGroundingBlock(place) {
 }
 
 function buildSystemPrompt(place, persona, grounding, language) {
-  const personaLine = PERSONA_INSTRUCTIONS[persona] || PERSONA_INSTRUCTIONS.general;
-  const languageLine = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.ko;
+  const personaLine = PERSONA_INSTRUCTIONS[pickKey(PERSONA_INSTRUCTIONS, persona, "general")];
+  const languageLine = LANGUAGE_INSTRUCTIONS[pickKey(LANGUAGE_INSTRUCTIONS, language, "ko")];
   const refusal = refusalText(place, language);
 
   return `당신은 "광주 ON AIR"의 AI 문화관광해설사입니다.
@@ -120,9 +125,37 @@ function parseBody(req) {
   return {};
 }
 
+// 인증 없는 공개 엔드포인트가 2027-03-31까지 하나의 무료 할당량을 쓴다.
+// 서버리스는 인스턴스마다 메모리가 분리되므로 이 제한은 완벽하지 않지만,
+// 한 클라이언트가 한 인스턴스를 두들기는 최악의 경우는 막아준다.
+const RATE_WINDOW_MS = 60000;
+const RATE_MAX_PER_WINDOW = 20;
+const rateHits = new Map();
+
+function isRateLimited(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "");
+  const ip = forwarded.split(",")[0].trim() || "unknown";
+  const now = Date.now();
+  const entry = rateHits.get(ip);
+
+  if (!entry || now - entry.start > RATE_WINDOW_MS) {
+    if (rateHits.size > 500) rateHits.clear(); // 메모리 상한
+    rateHits.set(ip, { start: now, count: 1 });
+    return false;
+  }
+
+  entry.count += 1;
+  return entry.count > RATE_MAX_PER_WINDOW;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "POST 요청만 지원합니다." });
+    return;
+  }
+
+  if (isRateLimited(req)) {
+    sendJson(res, 429, { error: "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요." });
     return;
   }
 
@@ -143,8 +176,8 @@ module.exports = async (req, res) => {
 
   const placeId = Number(body.placeId);
   const question = typeof body.question === "string" ? body.question.trim() : "";
-  const persona = typeof body.persona === "string" ? body.persona : "general";
-  const language = LANGUAGE_INSTRUCTIONS[body.language] ? body.language : "ko";
+  const persona = pickKey(PERSONA_INSTRUCTIONS, body.persona, "general");
+  const language = pickKey(LANGUAGE_INSTRUCTIONS, body.language, "ko");
 
   if (!Number.isFinite(placeId) || !question) {
     sendJson(res, 400, { error: "거점과 질문이 모두 필요합니다." });
@@ -196,7 +229,14 @@ module.exports = async (req, res) => {
           systemInstruction: {
             parts: [{ text: buildSystemPrompt(place, persona, grounding, language) }],
           },
-          generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1200,
+            // gemini-2.5-flash 는 기본적으로 추론 토큰을 쓰고, 그 토큰이 maxOutputTokens 를 함께 소모한다.
+            // 짧은 근거 기반 해설에는 추론이 필요 없는데, 그대로 두면 추론에 예산을 다 쓰고
+            // 본문이 빈 채 MAX_TOKENS 로 끝나 답변 가능한 질문까지 거절 문구가 나간다.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
         signal: controller.signal,
       }

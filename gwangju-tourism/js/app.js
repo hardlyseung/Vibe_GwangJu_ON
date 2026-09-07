@@ -38,6 +38,7 @@ const state = {
   map: null,
   markers: [],
   asking: false,
+  pendingAsk: null, // 진행 중인 /api/chat 요청의 AbortController
   userPos: null, // 위치 권한을 허용했을 때만 채워진다
   sortByDistance: false,
 };
@@ -53,6 +54,14 @@ function el(tag, className, text) {
 
 function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+// 칩을 누르면 그 줄을 통째로 다시 그리기 때문에 눌렀던 버튼이 사라지고
+// 키보드 포커스가 문서로 튕긴다. 같은 자리의 버튼으로 포커스를 되돌린다.
+function refocus(containerId, index) {
+  const box = document.getElementById(containerId);
+  const target = box && box.children[index];
+  if (target && typeof target.focus === "function") target.focus();
 }
 
 /* ---------- 데이터 판정 ---------- */
@@ -230,13 +239,15 @@ function renderThemeFilters() {
     chip.type = "button";
     chip.setAttribute("aria-pressed", String(state.activeTheme === theme));
     if (state.activeTheme === theme) chip.classList.add("active");
-    chip.addEventListener("click", () => {
+    chip.addEventListener("click", (e) => {
+      const index = [...e.currentTarget.parentNode.children].indexOf(e.currentTarget);
       state.activeTheme = theme;
       state.districtFilter = null; // 테마를 고르면 자치구 한정은 푼다
       renderThemeFilters();
       renderSpotList();
       renderMarkers(visibleSpots());
       setLocationStatus("");
+      refocus("theme-filters", index);
     });
     return chip;
   };
@@ -315,6 +326,13 @@ function shareUrlFor(spot) {
 }
 
 function selectSpot(spot) {
+  // 거점을 바꾸면 이전 거점에 대한 요청은 버린다.
+  // 그대로 두면 앞선 답변이 새 거점 화면에 도착한다.
+  if (state.pendingAsk) {
+    state.pendingAsk.abort();
+    state.pendingAsk = null;
+  }
+
   state.selected = spot;
   renderSpotList();
   renderDetail(spot);
@@ -753,7 +771,7 @@ function renderPersonaChips() {
   const box = document.getElementById("persona-chips");
   clear(box);
 
-  PERSONAS.forEach((p) => {
+  PERSONAS.forEach((p, idx) => {
     const chip = el("button", "chip", p.label);
     chip.type = "button";
     chip.setAttribute("aria-pressed", String(state.persona === p.id));
@@ -761,6 +779,7 @@ function renderPersonaChips() {
     chip.addEventListener("click", () => {
       state.persona = p.id;
       renderPersonaChips();
+      refocus("persona-chips", idx);
     });
     box.appendChild(chip);
   });
@@ -770,7 +789,7 @@ function renderLanguageChips() {
   const box = document.getElementById("language-chips");
   clear(box);
 
-  LANGUAGES.forEach((lang) => {
+  LANGUAGES.forEach((lang, idx) => {
     const chip = el("button", "chip chip-sm", lang.label);
     chip.type = "button";
     chip.setAttribute("aria-pressed", String(state.language === lang.id));
@@ -778,6 +797,7 @@ function renderLanguageChips() {
     chip.addEventListener("click", () => {
       state.language = lang.id;
       renderLanguageChips();
+      refocus("language-chips", idx);
     });
     box.appendChild(chip);
   });
@@ -803,17 +823,21 @@ function renderInsights() {
       .sort((a, b) => b.count - a.count);
   };
 
-  // 데이터에서 바로 읽히는 사실 하나를 문장으로 세운다.
-  const heritageThemes = ["호국·의병 유적", "민주화·독립운동"];
-  const heritage = state.spots.filter((s) => heritageThemes.includes(s.theme)).length;
-  const share = Math.round((heritage / total) * 100);
-
-  const lead = el("p", "insight-headline");
-  lead.appendChild(el("strong", null, `${total}곳 중 ${heritage}곳(${share}%)`));
-  lead.appendChild(
-    document.createTextNode("이 의병·호국 또는 민주화·독립운동과 관련된 장소입니다. 광주에 배치된 문화관광해설 인력이 어디에 집중돼 있는지를 보여줍니다.")
-  );
-  box.appendChild(lead);
+  // 강조할 테마 묶음은 데이터에서 선언한다. 코드에 테마 이름을 박아두면
+  // 원본이 갱신되며 이름이 바뀌었을 때 "0곳(0%)"이라는 문장이 조용히 화면에 남는다.
+  const insight = (state.raw && state.raw.insight) || null;
+  if (insight && Array.isArray(insight.themes)) {
+    const matched = state.spots.filter((s) => insight.themes.includes(s.theme)).length;
+    if (matched > 0) {
+      const share = Math.round((matched / total) * 100);
+      const lead = el("p", "insight-headline");
+      lead.appendChild(el("strong", null, `${total}곳 중 ${matched}곳(${share}%)`));
+      lead.appendChild(
+        document.createTextNode(`이 ${insight.label}과 관련된 장소입니다. ${insight.note || ""}`)
+      );
+      box.appendChild(lead);
+    }
+  }
 
   const grid = el("div", "insight-grid");
   [
@@ -899,19 +923,24 @@ async function askAi() {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const askedFor = state.selected;
+  state.pendingAsk = controller;
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        placeId: state.selected.id,
+        placeId: askedFor.id,
         persona: state.persona,
         language: state.language,
         question,
       }),
       signal: controller.signal,
     });
+
+    // 응답이 오는 사이 다른 거점으로 옮겼다면 이 답변은 버린다.
+    if (state.selected !== askedFor) return;
 
     // 로컬 정적 서버나 배포 설정 오류일 때는 JSON이 아니라 HTML이 돌아온다.
     let payload = null;
@@ -935,6 +964,9 @@ async function askAi() {
       const date = payload.source.date ? ` (기준일 ${payload.source.date})` : "";
       parts.push(`\n\n출처: ${payload.source.name}${date}`);
     }
+    if (payload.truncated) {
+      parts.push("\n\n(답변이 길어 일부가 잘렸습니다. 더 짧게 나눠 물어보시면 전체를 받을 수 있습니다.)");
+    }
     answerBox.textContent = parts.join("");
 
     // 자료로 답하지 못한 경우에는 사람에게 넘긴다. AI가 멈추는 지점이 서비스가 멈추는 지점이 아니다.
@@ -943,13 +975,17 @@ async function askAi() {
     }
   } catch (err) {
     if (err.name === "AbortError") {
-      answerBox.textContent = "응답이 지연되어 요청을 중단했습니다. 잠시 후 다시 시도해 주세요.";
+      // 거점을 바꿔서 취소한 경우에는 아무 말도 남기지 않는다. 타임아웃일 때만 안내한다.
+      if (state.selected === askedFor) {
+        answerBox.textContent = "응답이 지연되어 요청을 중단했습니다. 잠시 후 다시 시도해 주세요.";
+      }
     } else {
       console.error("[ai] 요청 실패", err);
       answerBox.textContent = "네트워크에 연결할 수 없습니다. 연결 상태를 확인해 주세요.";
     }
   } finally {
     clearTimeout(timer);
+    if (state.pendingAsk === controller) state.pendingAsk = null;
     setAsking(false);
   }
 }
