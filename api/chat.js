@@ -185,7 +185,24 @@ function isRateLimited(req) {
   return entry.count > RATE_MAX_PER_WINDOW;
 }
 
+// signal 이 이미 물려 있는 타임아웃 예산 안에서만 기다린다. 예산을 넘기면 delay 가 아니라
+// fetch 자신이 AbortError 를 던지도록, 여기서도 같은 signal 로 걸어 둔다.
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true }
+    );
+  });
+}
+
 // 모델 후보를 순서대로 호출한다. 404 는 "이 키에 그 모델 경로가 없다"는 뜻이라 다음 후보로 넘어가고,
+// 503 은 "이 모델이 지금 과부하"라는 구글 쪽 일시적 신호라 같은 모델로 짧게 한 번만 재시도한다.
 // 그 외 응답(성공이든 429/403이든)은 원인이 모델명이 아니므로 그대로 돌려준다.
 // AbortController 는 후보 전체에 공유된다 — 404 는 즉시 돌아오므로 총 예산을 넘기지 않는다.
 async function callGemini(apiKey, body, signal) {
@@ -194,20 +211,29 @@ async function callGemini(apiKey, body, signal) {
     : MODEL_CANDIDATES;
 
   let lastNotFound = null;
+  let lastUnavailable = null;
+
+  const request = (model) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body,
+      signal,
+    });
 
   for (const model of ordered) {
-    const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body,
-        signal,
-      }
-    );
+    let upstream = await request(model);
+
+    if (upstream.status === 503) {
+      console.warn(`[chat] 모델 ${model} 과부하(503) — 700ms 후 한 번 재시도`);
+      // 타임아웃 예산을 넘기면 delay 가 AbortError 를 던지고, 그대로 위로 전파되어
+      // 호출부의 catch 가 504(지연) 응답으로 처리한다.
+      await delay(700, signal);
+      upstream = await request(model);
+    }
 
     if (upstream.status === 404) {
       // 본문은 여기서 읽지 않는다 — 호출부가 실패를 최종 판단한 뒤 그 Response의 본문을
@@ -220,6 +246,14 @@ async function callGemini(apiKey, body, signal) {
       continue;
     }
 
+    if (upstream.status === 503) {
+      // 재시도까지 했는데도 과부하다. 다른 모델은 별도 용량 풀이라 안 바쁠 수 있으므로
+      // 여기서 포기하지 않고 다음 후보로 넘어간다.
+      console.warn(`[chat] 모델 ${model} 재시도도 과부하(503) — 다음 후보로 전환`);
+      lastUnavailable = upstream;
+      continue;
+    }
+
     if (upstream.ok) {
       if (resolvedModel !== model) {
         console.log(`[chat] 사용 모델 확정: ${model}`);
@@ -229,8 +263,9 @@ async function callGemini(apiKey, body, signal) {
     return upstream;
   }
 
-  // 후보가 전부 404. 호출부가 상태코드를 읽어 안내 문구를 만든다.
-  return lastNotFound;
+  // 후보를 전부 시도했다. 503(모델이 있고 응답했으나 바빴다)이 404(모델명 자체가 없다)보다
+  // 더 구체적인 신호이므로 우선 돌려준다.
+  return lastUnavailable || lastNotFound;
 }
 
 module.exports = async (req, res) => {
@@ -328,6 +363,12 @@ module.exports = async (req, res) => {
         // 후보 목록에 없다는 뜻이라, 키를 다시 확인하라고 안내하면 잘못된 곳을 뒤지게 된다.
         sendJson(res, 502, {
           error: "AI 모델을 사용할 수 없습니다. 아래 ‘빠른 안내’는 그대로 이용하실 수 있습니다. (업스트림 상태 404)",
+        });
+      } else if (upstream.status === 503) {
+        // 이미 한 번 재시도(callGemini)한 뒤에도 온 503이다. 구글 쪽 모델 과부하로,
+        // 키·모델명과 무관하다. "다시 시도" 라고만 말해야 사용자가 엉뚱한 설정을 뒤지지 않는다.
+        sendJson(res, 503, {
+          error: "AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.",
         });
       } else {
         // 원문은 안 보내되, 상태코드는 숫자뿐이라 노출해도 안전하고 원인 추적에 필수적이다.
