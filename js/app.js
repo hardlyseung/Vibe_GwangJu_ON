@@ -325,15 +325,7 @@ function shareUrlFor(spot) {
   return url.toString();
 }
 
-/* ---------- 모바일 한 컬럼 대응 ---------- */
-
-// CSS의 단일 컬럼 분기점과 같은 값이어야 한다. 여기만 바꾸면 화면과 어긋난다.
-const SINGLE_COLUMN_QUERY = "(max-width: 1100px)";
-
-function isSingleColumn() {
-  // matchMedia 가 없는 아주 오래된 환경에서는 데스크톱으로 간주해 아무것도 하지 않는다.
-  return typeof window.matchMedia === "function" && window.matchMedia(SINGLE_COLUMN_QUERY).matches;
-}
+/* ---------- 선택 → 상세로 데려가기 ---------- */
 
 function prefersReducedMotion() {
   return (
@@ -342,12 +334,12 @@ function prefersReducedMotion() {
   );
 }
 
-// 한 컬럼에서는 상세 패널이 목록 한참 아래에 있다. 거점을 눌러도 화면이 그대로라
-// 아무 일도 안 일어난 것처럼 보이므로, 선택한 내용이 있는 곳으로 데려간다.
-// 3단 레이아웃에서는 이미 옆에 보이고 있으니 건드리지 않는다.
+// 상세 패널은 이제 화면 폭과 관계없이 지도 섹션 "아래"에 있다.
+// (3단 나란히 배치를 히어로+섹션 리듬으로 바꾸면서 생긴 구조 변화다.)
+// 거점을 눌러도 화면이 그대로면 아무 일도 안 일어난 것처럼 보이므로
+// 폭을 따지지 않고 선택한 내용이 있는 곳으로 데려간다.
+// 이미 화면에 들어와 있으면 아래 가시성 검사에서 걸러진다.
 function revealDetail() {
-  if (!isSingleColumn()) return;
-
   const panel = document.getElementById("detail-panel");
   if (!panel) return;
 
@@ -418,14 +410,15 @@ function renderDetail(spot) {
   const panel = document.getElementById("detail-panel");
   clear(panel);
 
-  // 한 컬럼에서는 상세로 내려온 뒤 목록이 화면 밖으로 밀린다. 돌아갈 길을 만들어 준다.
-  // 3단 레이아웃에서는 목록이 이미 옆에 있으므로 CSS에서 숨긴다.
+  // 상세로 내려오면 목록이 화면 위로 밀린다. 돌아갈 길을 만들어 준다.
   const back = el("button", "back-to-list", "← 목록으로");
   back.type = "button";
   back.addEventListener("click", scrollToList);
   panel.appendChild(back);
 
-  panel.appendChild(el("h2", "detail-name", spot.name));
+  // 섹션 제목("거점 상세")이 이미 h2다. 거점 이름을 h2로 두면 같은 층에
+  // 제목이 둘이 되어 스크린리더의 문서 구조가 어긋난다. 한 단계 낮춘다.
+  panel.appendChild(el("h3", "detail-name", spot.name));
 
   const badges = el("div", "badge-row");
   badges.appendChild(el("span", "badge", spot.district));
@@ -945,6 +938,20 @@ function renderInsights() {
   box.appendChild(grid);
 }
 
+/* ---------- 히어로 통계 ---------- */
+
+// 첫 화면의 숫자는 문구에 박아두지 않고 실제 로드된 데이터에서 센다.
+// 원본이 갱신돼 거점 수가 바뀌었을 때 "18곳"이라는 문장만 조용히 거짓이 되는 걸 막는다.
+function renderHeroStats() {
+  const put = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  };
+  put("stat-spots", String(state.spots.length));
+  put("stat-themes", String(state.themes.length));
+  put("stat-langs", String(LANGUAGES.length));
+}
+
 function setAsking(asking) {
   state.asking = asking;
   const btn = document.getElementById("ai-ask-btn");
@@ -1167,6 +1174,7 @@ async function main() {
     ? data.themes
     : [...new Set(state.spots.map((s) => s.theme).filter(Boolean))];
 
+  renderHeroStats();
   renderThemeFilters();
   renderSpotList();
   renderPersonaChips();

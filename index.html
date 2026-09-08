@@ -5,127 +5,246 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>광주 ON AIR</title>
 <meta name="description" content="광주관광공사 개방데이터로 만든 문화관광해설 거점 안내 서비스. 지도에서 거점을 찾고 공식 자료에 근거한 AI 해설을 듣습니다." />
+<meta name="theme-color" content="#1b5fa8" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-<a class="skip-link" href="#spot-list">본문 바로가기</a>
+<a class="skip-link" href="#main-content">본문 바로가기</a>
 
-<header class="app-header">
-  <div class="header-inner">
-    <h1>광주 ON AIR</h1>
-    <p class="subtitle">지도를 누르면 광주의 이야기가 시작됩니다</p>
+<header class="site-header">
+  <div class="grid-container">
+    <div class="header-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+          </svg>
+        </span>
+        <span>
+          <strong class="brand-name">광주 ON AIR</strong>
+          <span class="brand-sub">문화관광해설 거점 안내</span>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a href="#spots">거점 찾기</a>
+        <a href="#detail">거점 상세</a>
+        <a href="#ai">AI 해설</a>
+        <a href="#data">공공데이터</a>
+      </nav>
+    </div>
   </div>
 </header>
 
-<main class="layout">
-  <aside class="panel panel-list">
-    <section>
-      <h2 id="filter-heading">테마</h2>
-      <div id="theme-filters" class="chip-row" role="group" aria-labelledby="filter-heading"></div>
-    </section>
+<main id="main-content">
 
-    <section class="list-section">
-      <h2>문화관광해설 거점 <span id="spot-count" class="count"></span></h2>
-      <div class="list-tools">
-        <label class="sr-only" for="spot-search">거점 검색</label>
-        <input id="spot-search" class="search-input" type="search" placeholder="이름·주소로 찾기" autocomplete="off" />
-        <button id="nearby-btn" class="chip" type="button" aria-pressed="false">내 위치에서 가까운 순</button>
+  <section id="top" class="hero">
+    <div class="grid-container">
+      <div class="hero-inner">
+        <span class="hero-eyebrow"><span class="hero-dot" aria-hidden="true"></span> Gwangju Cultural Tourism Guide</span>
+        <h1 class="hero-title">광주를 듣고,<br />다시 걷다.</h1>
+        <p class="hero-copy">
+          문화관광해설 거점의 위치와 이야기를 한곳에서 확인하세요.<br />
+          광주관광공사 개방데이터에 근거해 안내하고, 자료에 없는 것은 없다고 말합니다.
+        </p>
+        <div class="hero-stat">
+          <div><strong id="stat-spots">–</strong><span>문화관광해설 거점</span></div>
+          <div><strong id="stat-themes">–</strong><span>테마로 찾기</span></div>
+          <div><strong id="stat-langs">–</strong><span>해설 언어</span></div>
+        </div>
       </div>
-      <p id="location-status" class="status-line"></p>
-      <ul id="spot-list" class="spot-list"></ul>
-    </section>
-  </aside>
-
-  <section class="map-area" aria-label="관광지 지도">
-    <div id="map"></div>
+    </div>
   </section>
 
-  <aside class="panel panel-detail">
-    <section id="detail-panel" class="detail-panel">
-      <p class="empty-hint">지도에서 거점을 선택하면 상세 정보가 표시됩니다.</p>
-    </section>
-
-    <section class="ai-section">
-      <h2>AI 문화관광해설</h2>
-      <div id="persona-chips" class="chip-row" role="group" aria-label="해설 톤 선택"></div>
-      <div id="language-chips" class="chip-row chip-row-sub" role="group" aria-label="답변 언어 선택"></div>
-      <div class="ai-input-row">
-        <label class="sr-only" for="ai-question">질문 입력</label>
-        <input
-          id="ai-question"
-          type="text"
-          maxlength="200"
-          autocomplete="off"
-          placeholder="예: 이곳의 핵심 역사 이야기는?"
-        />
-        <button id="ai-ask-btn" class="btn btn-primary" type="button">질문</button>
+  <!-- 01 · 거점 찾기 — app.js 의 focusDistrict() 가 .layout 을 스크롤 대상으로 잡는다 -->
+  <section id="spots" class="section layout">
+    <div class="grid-container">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">01 · FIND YOUR PLACE</span>
+          <h2 class="section-title">거점 찾기</h2>
+          <p class="section-description">테마와 이름으로 원하는 장소를 찾고, 지도에서 위치를 확인해 보세요.</p>
+        </div>
+        <span class="count-label"><strong id="spot-count">–</strong> 표시 중</span>
       </div>
-      <div id="ai-answer" class="answer-box" role="status" aria-live="polite"></div>
-    </section>
 
-    <section>
-      <h2>빠른 안내</h2>
+      <div class="grid-layout">
+        <div class="list-column">
+          <aside class="panel panel-list">
+            <section>
+              <h2 id="filter-heading">테마</h2>
+              <div id="theme-filters" class="chip-row" role="group" aria-labelledby="filter-heading"></div>
+            </section>
+
+            <section class="list-section">
+              <h2>문화관광해설 거점</h2>
+              <div class="list-tools">
+                <div class="search-wrap">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                  </svg>
+                  <label class="sr-only" for="spot-search">거점 검색</label>
+                  <input id="spot-search" class="search-input" type="search" placeholder="이름·주소로 찾기" autocomplete="off" />
+                </div>
+                <button id="nearby-btn" class="toggle-button" type="button" aria-pressed="false">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /><path d="M12 1v3M12 20v3M1 12h3M20 12h3" />
+                  </svg>
+                  가까운 순
+                </button>
+              </div>
+              <p id="location-status" class="status-line"></p>
+              <ul id="spot-list" class="spot-list"></ul>
+            </section>
+          </aside>
+        </div>
+
+        <div class="map-column">
+          <section class="map-area" aria-label="관광지 지도">
+            <div id="map"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02·03 · 거점 상세 + AI 해설 -->
+  <section id="detail" class="section">
+    <div class="grid-container">
+      <div class="grid-layout">
+        <div class="detail-column">
+          <span class="section-kicker">02 · PLACE DETAIL</span>
+          <h2 class="column-title">거점 상세</h2>
+          <section id="detail-panel" class="panel detail-panel">
+            <p class="empty-hint">지도나 목록에서 거점을 선택하면 상세 정보가 표시됩니다.</p>
+          </section>
+        </div>
+
+        <div class="ai-column" id="ai">
+          <span class="section-kicker">03 · AI COMMENTARY</span>
+          <h2 class="column-title">AI 문화관광해설</h2>
+          <section class="panel ai-section">
+            <div>
+              <p class="section-description ai-intro">
+                공식 자료를 근거로 답합니다. 자료에 없는 내용은 지어내지 않고 현장 해설사로 연결합니다.
+              </p>
+
+              <span class="field-label" id="persona-label">해설 톤</span>
+              <div id="persona-chips" class="chip-row" role="group" aria-labelledby="persona-label"></div>
+
+              <span class="field-label field-label-gap" id="language-label">답변 언어</span>
+              <div id="language-chips" class="chip-row chip-row-sub" role="group" aria-labelledby="language-label"></div>
+
+              <div class="ai-input-row">
+                <label class="sr-only" for="ai-question">질문 입력</label>
+                <input
+                  id="ai-question"
+                  type="text"
+                  maxlength="200"
+                  autocomplete="off"
+                  placeholder="예: 이곳의 핵심 역사 이야기는?"
+                />
+                <button id="ai-ask-btn" class="btn btn-primary" type="button">질문</button>
+              </div>
+              <div id="ai-answer" class="answer-box" role="status" aria-live="polite"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · 빠른 안내 -->
+  <section class="section">
+    <div class="grid-container">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">04 · QUICK GUIDE</span>
+          <h2 class="section-title">빠른 안내</h2>
+          <p class="section-description">AI 없이도 데이터만으로 바로 답할 수 있는 질문입니다. AI가 멈춰도 이 영역은 동작합니다.</p>
+        </div>
+      </div>
       <div id="faq-questions" class="chip-row"></div>
       <div id="faq-answer" class="answer-box" role="status" aria-live="polite"></div>
-    </section>
-  </aside>
-</main>
+    </div>
+  </section>
 
-<section id="exhibition-band" class="band" hidden>
-  <div class="band-inner">
-    <h2>지금 광주에서</h2>
-    <p class="band-lead">광주관광공사 주관 전시회 일정입니다.</p>
-    <div id="exhibition-list" class="exhibition-list"></div>
-  </div>
-</section>
-
-<section class="band band-alt" aria-labelledby="datasets-heading">
-  <div class="band-inner">
-    <h2 id="datasets-heading">활용한 공공데이터</h2>
-    <p class="band-lead">광주광역시관광공사 개방데이터를 현장에서 쓸 수 있는 형태로 재구성했습니다.</p>
-    <div id="dataset-list" class="dataset-list"></div>
-
-    <details class="sub-block fold">
-      <summary><h3>데이터로 본 광주</h3><span class="fold-hint">테마·자치구 분포</span></summary>
-      <div id="insight-block" class="insight-block"></div>
-    </details>
-
-    <details id="quality-block" class="sub-block fold" hidden>
-      <summary><h3>데이터 검증 기록</h3><span class="fold-hint">정정·보완·한계</span></summary>
-      <p id="quality-note" class="band-lead"></p>
-      <div id="quality-list" class="quality-list"></div>
-    </details>
-
-    <details class="sub-block fold">
-      <summary><h3>운영 계획</h3><span class="fold-hint">2027년 3월 31일까지</span></summary>
-      <p class="band-lead">
-        공모 조건에 따라 <strong>2027년 3월 31일까지</strong> 외부에서 접속 가능한 상태로 운영합니다.
-      </p>
-      <div class="ops-grid">
-        <div class="ops-item">
-          <h4>비용</h4>
-          <p>정적 호스팅·지도 SDK·AI 모두 상시 무료 티어를 사용합니다. 기한이 있는 체험 크레딧에 의존하지 않으므로 만료로 서비스가 중단되지 않습니다.</p>
-        </div>
-        <div class="ops-item">
-          <h4>장애 대응</h4>
-          <p>지도와 AI는 각각 독립적으로 실패해도 나머지 기능이 계속 동작합니다. 한 곳이 멈춰도 서비스 전체가 내려가지 않습니다.</p>
-        </div>
-        <div class="ops-item">
-          <h4>데이터 갱신</h4>
-          <p>원본 데이터가 갱신되면 변환 스크립트를 다시 실행하고 데이터 파일만 교체합니다. 코드 수정이 필요 없습니다.</p>
-        </div>
-        <div class="ops-item">
-          <h4>확장</h4>
-          <p>데이터셋 추가는 선언 항목을 늘리는 작업입니다. 공사의 다른 개방데이터를 같은 방식으로 붙일 수 있습니다.</p>
+  <!-- 05 · 지금 광주에서 -->
+  <section id="exhibition-band" class="section" hidden>
+    <div class="grid-container">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">05 · NOW IN GWANGJU</span>
+          <h2 class="section-title">지금 광주에서</h2>
+          <p class="section-description">광주관광공사 주관 전시회 일정입니다.</p>
         </div>
       </div>
-    </details>
-  </div>
-</section>
+      <div id="exhibition-list" class="exhibition-list"></div>
+    </div>
+  </section>
 
-<footer class="app-footer">
-  <p class="footer-sub">2026 광주관광공사 노코드·바이브코딩 AI 활용 데이터 공모전 출품작</p>
+  <!-- 06 · 활용한 공공데이터 -->
+  <section id="data" class="section section-sunk" aria-labelledby="datasets-heading">
+    <div class="grid-container">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">06 · DATA TRANSPARENCY</span>
+          <h2 class="section-title" id="datasets-heading">활용한 공공데이터</h2>
+          <p class="section-description">이 서비스가 무엇을 근거로 작동하는지 공개합니다. 건수는 실제 로드된 데이터에서 셉니다.</p>
+        </div>
+      </div>
+
+      <div id="dataset-list" class="dataset-list"></div>
+
+      <details class="sub-block">
+        <summary><h3>데이터로 본 광주</h3><span class="fold-hint">테마·자치구 분포</span></summary>
+        <div id="insight-block" class="insight-block"></div>
+      </details>
+
+      <details id="quality-block" class="sub-block" hidden>
+        <summary><h3>데이터 검증 기록</h3><span class="fold-hint">정정·보완·한계</span></summary>
+        <p id="quality-note" class="band-lead"></p>
+        <div id="quality-list" class="quality-list"></div>
+      </details>
+
+      <details class="sub-block">
+        <summary><h3>운영 계획</h3><span class="fold-hint">2027년 3월 31일까지</span></summary>
+        <p class="band-lead">
+          공모 조건에 따라 <strong>2027년 3월 31일까지</strong> 외부에서 접속 가능한 상태로 운영합니다.
+        </p>
+        <div class="ops-grid">
+          <div class="ops-item">
+            <h4>비용</h4>
+            <p>정적 호스팅·지도 SDK·AI 모두 상시 무료 티어를 사용합니다. 기한이 있는 체험 크레딧에 의존하지 않으므로 만료로 서비스가 중단되지 않습니다.</p>
+          </div>
+          <div class="ops-item">
+            <h4>장애 대응</h4>
+            <p>지도와 AI는 각각 독립적으로 실패해도 나머지 기능이 계속 동작합니다. 한 곳이 멈춰도 서비스 전체가 내려가지 않습니다.</p>
+          </div>
+          <div class="ops-item">
+            <h4>데이터 갱신</h4>
+            <p>원본 데이터가 갱신되면 변환 스크립트를 다시 실행하고 데이터 파일만 교체합니다. 코드 수정이 필요 없습니다.</p>
+          </div>
+          <div class="ops-item">
+            <h4>확장</h4>
+            <p>데이터셋 추가는 선언 항목을 늘리는 작업입니다. 공사의 다른 개방데이터를 같은 방식으로 붙일 수 있습니다.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="grid-container">
+    <div class="footer-inner">
+      <p><strong>광주 ON AIR</strong> · 문화관광해설 거점 안내</p>
+      <p class="footer-sub">2026 광주관광공사 노코드·바이브코딩 AI 활용 데이터 공모전 출품작</p>
+    </div>
+  </div>
 </footer>
 
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=91c073489a8d4aaf847cf49ef9bbb679&autoload=false"></script>
