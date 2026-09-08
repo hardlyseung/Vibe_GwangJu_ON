@@ -25,12 +25,17 @@ try {
 //
 // "-latest" 별명은 쓰지 않는다 — Google이 신모델을 낼 때마다 조용히 그쪽을 가리키도록
 // 바뀌는데, 갓 나온 모델은 무료 할당량이 분당 5회·하루 20회 수준으로 극히 작게 잡혀
-// 있는 경우가 있다(2026-09-08 실측). gemini-2.0-flash 는 2026-06-01 에 서비스가 아예
-// 종료되어 항상 404 만 돌아온다. 둘 다 지금 상태를 안 만드는 게 나아서 후보에서 뺐다.
+// 있는 경우가 있다(2026-09-08 실측).
 //
-// ⚠️ gemini-2.5-flash 는 2026-10-16 서비스 종료 예정이다(gemini-2.5-flash-lite 도 동일).
-// 공모전 운영 조건(2027-03-31까지 접속 가능)을 지키려면 그 전에 이 목록을 갱신해야 한다.
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+// 이 프로젝트의 실제 키는 세대가 넘어가 gemini-2.x·-latest 계열이 전부 404 였고,
+// AI Studio Playground 의 "Get code" 로 확인한 정확한 슬러그가 gemini-3.5-flash-lite다.
+// Lite 계열은 방금 나온 gemini-3.8-flash(RPM 5/RPD 20)보다 무료 할당량이 넉넉해 주 후보로
+// 쓰고, 3.8-flash 는 그게 막혔을 때 쓸 여분으로만 둔다.
+//
+// ⚠️ 이 키가 어떤 세대를 열어주는지는 계정마다 다르다. 다음에 또 전부 404 가 뜨면
+// aistudio.google.com → Playground → 원하는 모델 선택 → "Get code" 로 정확한 model
+// 문자열을 다시 확인할 것 — 표시 이름("Gemini 3.5 Flash Lite")과 API 슬러그가 다르다.
+const MODEL_CANDIDATES = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
 let resolvedModel = null;
 const MAX_QUESTION_LENGTH = 200;
 // Vercel Hobby 함수는 오래 걸리면 플랫폼이 먼저 끊는다.
