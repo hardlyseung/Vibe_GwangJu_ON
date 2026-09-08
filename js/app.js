@@ -598,7 +598,10 @@ function renderExhibitions() {
 
     const top = el("div", "exhibition-top");
     top.appendChild(el("span", `badge phase-${phase}`, phaseLabel[phase]));
-    top.appendChild(el("span", "exhibition-period", formatPeriod(ex)));
+    // 날짜가 아예 없으면 뱃지가 이미 "일정 미정"이라, 기간까지 같은 문구로 찍으면 두 번 나온다.
+    if (phase !== "unknown") {
+      top.appendChild(el("span", "exhibition-period", formatPeriod(ex)));
+    }
     card.appendChild(top);
 
     card.appendChild(el("h3", "exhibition-name", ex.name));
