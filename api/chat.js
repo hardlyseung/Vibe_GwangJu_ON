@@ -22,7 +22,15 @@ try {
 // 모델명은 키가 속한 계정·프로젝트에 따라 제공 여부가 다르다. 없는 이름으로 부르면
 // 인증 오류가 아니라 404(경로 없음)가 돌아오므로, 후보를 순서대로 시도한다.
 // 성공한 이름은 워밍된 함수 인스턴스에 기억해 두어 다음 요청부터는 한 번에 맞춘다.
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+//
+// "-latest" 별명은 쓰지 않는다 — Google이 신모델을 낼 때마다 조용히 그쪽을 가리키도록
+// 바뀌는데, 갓 나온 모델은 무료 할당량이 분당 5회·하루 20회 수준으로 극히 작게 잡혀
+// 있는 경우가 있다(2026-09-08 실측). gemini-2.0-flash 는 2026-06-01 에 서비스가 아예
+// 종료되어 항상 404 만 돌아온다. 둘 다 지금 상태를 안 만드는 게 나아서 후보에서 뺐다.
+//
+// ⚠️ gemini-2.5-flash 는 2026-10-16 서비스 종료 예정이다(gemini-2.5-flash-lite 도 동일).
+// 공모전 운영 조건(2027-03-31까지 접속 가능)을 지키려면 그 전에 이 목록을 갱신해야 한다.
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 let resolvedModel = null;
 const MAX_QUESTION_LENGTH = 200;
 // Vercel Hobby 함수는 오래 걸리면 플랫폼이 먼저 끊는다.
