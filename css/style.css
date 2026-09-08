@@ -116,6 +116,8 @@ body {
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
   }
   .map-area {
     order: -1;
@@ -920,4 +922,65 @@ body {
 
 .footer-sub {
   font-size: 11.5px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   모바일 대응 — 반드시 파일 맨 끝에 둔다.
+
+   앞쪽 미디어쿼리에 써 두면 뒤에 나오는 같은 특이도의 기본 규칙
+   (.map-area{min-height:520px}, .btn{min-height:42px} 등)에 덮어써진다.
+   실제로 그렇게 두 번 당했다. 순서로 이기게 하려고 여기에 모았다.
+   ══════════════════════════════════════════════════════════════ */
+
+/* 상세로 내려온 뒤 목록으로 돌아갈 길.
+   기본은 숨김 — 3단 레이아웃에서는 목록이 이미 옆에 보인다.
+   기본값을 먼저 쓰고 아래 미디어쿼리에서 켠다. 순서가 반대면 미디어쿼리가 진다. */
+.back-to-list {
+  display: none;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 4px;
+  margin: -4px 0 2px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  /* 한 컬럼에서 지도가 520px이면 화면 절반 이상을 먹는다. 그만큼 목록·상세가
+     아래로 밀려 스크롤 거리가 늘어나므로, 알아볼 만한 선까지 줄인다. */
+  .map-area,
+  #map,
+  .map-fallback {
+    min-height: 320px;
+  }
+
+  .panel {
+    padding: 14px;
+    gap: 18px;
+  }
+
+  .back-to-list {
+    display: inline-flex;
+  }
+}
+
+/* 손가락으로 누르는 화면에서는 44px 미만 타깃이 잘 안 눌린다(WCAG 2.5.5).
+   포인터가 정밀한 기기는 제외해 데스크톱 밀도는 그대로 둔다. */
+@media (pointer: coarse) {
+  .chip,
+  .btn,
+  .spot-item,
+  .linkish {
+    min-height: 44px;
+  }
+
+  .chip {
+    padding: 10px 15px;
+  }
 }

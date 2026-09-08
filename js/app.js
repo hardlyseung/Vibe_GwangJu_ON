@@ -325,6 +325,65 @@ function shareUrlFor(spot) {
   return url.toString();
 }
 
+/* ---------- 모바일 한 컬럼 대응 ---------- */
+
+// CSS의 단일 컬럼 분기점과 같은 값이어야 한다. 여기만 바꾸면 화면과 어긋난다.
+const SINGLE_COLUMN_QUERY = "(max-width: 1100px)";
+
+function isSingleColumn() {
+  // matchMedia 가 없는 아주 오래된 환경에서는 데스크톱으로 간주해 아무것도 하지 않는다.
+  return typeof window.matchMedia === "function" && window.matchMedia(SINGLE_COLUMN_QUERY).matches;
+}
+
+function prefersReducedMotion() {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+// 한 컬럼에서는 상세 패널이 목록 한참 아래에 있다. 거점을 눌러도 화면이 그대로라
+// 아무 일도 안 일어난 것처럼 보이므로, 선택한 내용이 있는 곳으로 데려간다.
+// 3단 레이아웃에서는 이미 옆에 보이고 있으니 건드리지 않는다.
+function revealDetail() {
+  if (!isSingleColumn()) return;
+
+  const panel = document.getElementById("detail-panel");
+  if (!panel) return;
+
+  // 클릭 직후에는 방금 다시 그린 DOM의 위치가 아직 확정되지 않았을 수 있다.
+  requestAnimationFrame(() => {
+    const rect = panel.getBoundingClientRect();
+
+    // 이미 화면에 충분히 들어와 있으면 다시 스크롤해 흔들지 않는다.
+    const alreadyVisible = rect.top >= 0 && rect.top < window.innerHeight * 0.6;
+    if (alreadyVisible) return;
+
+    try {
+      panel.scrollIntoView({
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+        block: "start",
+      });
+    } catch (err) {
+      // 옵션 객체를 못 받는 구형 브라우저는 인자 없이 부른다.
+      panel.scrollIntoView();
+    }
+  });
+}
+
+function scrollToList() {
+  const list = document.querySelector(".panel-list");
+  if (!list) return;
+  try {
+    list.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    });
+  } catch (err) {
+    list.scrollIntoView();
+  }
+}
+
 function selectSpot(spot) {
   // 거점을 바꾸면 이전 거점에 대한 요청은 버린다.
   // 그대로 두면 앞선 답변이 새 거점 화면에 도착한다.
@@ -338,6 +397,7 @@ function selectSpot(spot) {
   renderDetail(spot);
   document.getElementById("ai-answer").textContent = "";
   clearHandoff();
+  revealDetail();
 
   // 주소창을 갱신해 두면 이 화면 그대로 공유·재방문할 수 있다.
   // file:// 등 일부 환경에서는 replaceState가 막히므로 실패해도 넘어간다.
@@ -357,6 +417,13 @@ function addRow(dl, label, value) {
 function renderDetail(spot) {
   const panel = document.getElementById("detail-panel");
   clear(panel);
+
+  // 한 컬럼에서는 상세로 내려온 뒤 목록이 화면 밖으로 밀린다. 돌아갈 길을 만들어 준다.
+  // 3단 레이아웃에서는 목록이 이미 옆에 있으므로 CSS에서 숨긴다.
+  const back = el("button", "back-to-list", "← 목록으로");
+  back.type = "button";
+  back.addEventListener("click", scrollToList);
+  panel.appendChild(back);
 
   panel.appendChild(el("h2", "detail-name", spot.name));
 
