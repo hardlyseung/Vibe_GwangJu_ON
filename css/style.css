@@ -680,6 +680,67 @@ body {
   font-weight: 700;
 }
 
+/* ---------- 접히는 근거 자료 ----------
+   이 세 블록은 합쳐서 페이지의 절반을 차지하는데, 읽는 사람이 다르다.
+   심사·검증용 근거라 관광객에게는 매번 스크롤 부담일 뿐이므로 접어 둔다.
+   지우지는 않는다 — 데이터 활용 근거는 이 서비스가 내세우는 핵심이다.
+   <details>/<summary> 라 펼침 상태·키보드·스크린리더를 브라우저가 처리한다. */
+
+.fold > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 44px;
+  padding-right: 26px;
+  position: relative;
+}
+
+/* 사파리의 기본 삼각형 마커 제거 (다른 브라우저는 list-style:none 으로 처리됨) */
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary h3 {
+  margin: 0;
+}
+
+.fold-hint {
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+/* 펼침 표시 — 직접 그린다. 기본 마커는 브라우저마다 위치·모양이 제각각이다. */
+.fold > summary::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  top: 12px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-soft);
+  border-bottom: 2px solid var(--text-soft);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.fold[open] > summary::after {
+  transform: rotate(-135deg);
+  top: 16px;
+}
+
+.fold > summary:hover h3,
+.fold > summary:hover .fold-hint {
+  color: var(--primary);
+}
+
+/* JS가 renderQuality()에서 hidden 을 켜고 끈다. details 기본 display 보다 우선해야 한다. */
+.sub-block[hidden] {
+  display: none;
+}
+
 /* ---------- 데이터로 본 광주 ---------- */
 
 .insight-headline {
