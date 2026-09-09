@@ -132,6 +132,20 @@ function buildGroundingBlock(place) {
   return lines.join("\n");
 }
 
+// 모델이 자료 부족으로 거절하면 우리가 프롬프트에 넣어 준 그 문장을 그대로 돌려준다.
+// 성공 응답이지만 "자료로 답한 것"은 아니므로 근거 있음으로 보내면 안 된다.
+// 이 서비스가 사람 해설사로 넘기는 지점이 정확히 여기라, 이 구분이 곧 화면 동작이 된다.
+function isRefusal(answer, refusal) {
+  const norm = (t) => t.replace(/\s+/g, " ").trim();
+  const a = norm(answer);
+  const r = norm(refusal);
+  if (a === r) return true;
+  // 모델이 전화번호를 빠뜨리거나 뒤에 한 문장을 덧붙이는 경우까지 받아 준다.
+  // 첫 문장만으로 판정한다 — 뒤따르는 연락처 안내는 흔들려도 첫 문장은 그대로 돌아온다.
+  const head = norm(r.split(/[.。]/)[0]);
+  return head.length >= 10 && a.startsWith(head);
+}
+
 function buildSystemPrompt(place, persona, grounding, language) {
   const personaLine = PERSONA_INSTRUCTIONS[pickKey(PERSONA_INSTRUCTIONS, persona, "general")];
   const languageLine = LANGUAGE_INSTRUCTIONS[pickKey(LANGUAGE_INSTRUCTIONS, language, "ko")];
@@ -435,9 +449,13 @@ module.exports = async (req, res) => {
       return;
     }
 
+    const refused = isRefusal(answer, notFound);
+    if (refused) console.log(`[chat] 자료 부족으로 거절 place=${place.name} — 해설사 연결로 넘김`);
+
     sendJson(res, 200, {
       answer,
-      grounded: true,
+      grounded: !refused,
+      reason: refused ? "not_found" : undefined,
       truncated: finishReason === "MAX_TOKENS",
       source,
     });
