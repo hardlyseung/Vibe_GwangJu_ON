@@ -45,6 +45,7 @@ const state = {
   discoverIds: null,
   discovering: false,
   mapPopup: null, // 열려 있는 마커 팝업(CustomOverlay). 한 번에 하나만 띄운다.
+  pendingDiscover: null, // 진행 중인 추천 요청의 AbortController
 };
 
 // 무엇을 입력해야 할지 모르면 입력창은 비어 있는 채로 남는다. 예시를 눌러서 시작할 수 있게 한다.
@@ -435,6 +436,7 @@ function renderThemeFilters() {
       // 테마를 직접 고른다는 건 AI 추천을 그만 보겠다는 뜻이다. 둘이 겹치면
       // 목록이 왜 이렇게 나왔는지 설명할 수 없다.
       state.discoverIds = null;
+      cancelPendingDiscover();
       setDiscoverStatus("");
       renderThemeFilters();
       renderSpotList();
@@ -514,6 +516,15 @@ function renderSpotList() {
    AI가 그 판단을 대신 하면 "아이랑 반나절"처럼 데이터에 없는 말로도 찾을 수 있다.
    단, AI가 죽어도 탐색 자체는 살아야 하므로 실패하면 규칙 기반 검색으로 넘어간다. */
 
+// 사용자가 테마를 고르거나 추천을 지우면, 날아오고 있던 이전 추천 응답은 버려야 한다.
+// 그대로 두면 늦게 도착한 응답이 방금 한 선택을 조용히 덮어쓴다.
+function cancelPendingDiscover() {
+  if (!state.pendingDiscover) return;
+  state.pendingDiscover.superseded = true; // 타임아웃이 아니라 의도적 취소라는 표시
+  state.pendingDiscover.abort();
+  state.pendingDiscover = null;
+}
+
 function setDiscovering(on) {
   state.discovering = on;
   const btn = document.getElementById("discover-btn");
@@ -539,6 +550,7 @@ function setDiscoverStatus(message, withReset) {
 }
 
 function clearDiscover() {
+  cancelPendingDiscover();
   state.discoverIds = null;
   const input = document.getElementById("discover-input");
   if (input) input.value = "";
@@ -649,6 +661,7 @@ async function runDiscover() {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  state.pendingDiscover = controller;
 
   try {
     const res = await fetch("/api/chat", {
@@ -684,6 +697,9 @@ async function runDiscover() {
     );
   } catch (err) {
     if (err.name === "AbortError") {
+      // 사용자가 다른 조작을 해서 취소된 경우에는 아무 말도 남기지 않는다.
+      // 그 조작의 결과가 이미 화면에 있으므로, 여기서 폴백을 돌리면 그걸 덮어쓴다.
+      if (controller.superseded) return;
       applyKeywordFallback(query, "AI 추천이 지연되어");
     } else {
       console.error("[discover] 요청 실패", err);
@@ -691,6 +707,7 @@ async function runDiscover() {
     }
   } finally {
     clearTimeout(timer);
+    if (state.pendingDiscover === controller) state.pendingDiscover = null;
     setDiscovering(false);
   }
 }
@@ -1114,6 +1131,7 @@ function focusDistrict(district) {
   state.activeTheme = null;
   state.districtFilter = district;
   state.discoverIds = null;
+  cancelPendingDiscover();
   setDiscoverStatus("");
   renderThemeFilters();
   renderSpotList();

@@ -58,20 +58,26 @@ AI 코딩 도구가 이 저장소에서 작업할 때 지켜야 할 규칙이다
 
 ```
 index.html          화면 구조
-css/style.css       스타일 (다크모드 대응)
-js/app.js           지도·필터·목록·상세·전시·AI 호출
+css/style.css       스타일 (디자인 토큰 · 다크모드 · 반응형)
+js/app.js           지도·필터·목록·상세·전시·AI 추천·AI 호출
 api/chat.js         서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
+vercel.json         보안 헤더 (빌드 설정은 없다)
 data/places.json    거점 18곳 + 데이터셋 선언 + 검증 기록
 data/exhibitions.json  전시회 (변환 전에는 빈 배열)
 scripts/geocode.js             주소 → 좌표 (카카오 로컬 API)
 scripts/convert-exhibitions.js 전시회 CSV → JSON
+tests/origin.js     /api/chat 출처 검증 점검 (의존성 없음)
+tests/security.js   보안 방어 자동 점검 (의존성 없음)
+README.md           프로젝트 소개 · 실행 · 배포 · 알려진 한계
+SECURITY.md         위협 모델 · 무엇을 막고 무엇을 못 막는지
 ```
 
 ## 코드 관례
 
 - 한국어 주석. 무엇을 하는지가 아니라 **왜 그렇게 했는지**를 적는다.
 - DOM은 `el()` 헬퍼로 만든다. 데이터를 `innerHTML` 문자열에 끼워 넣지 않는다.
-  (예외: 카카오 InfoWindow는 문자열만 받으므로 `escapeHtml()` 을 거친다.)
+  예외 없다. 카카오 지도 팝업도 `CustomOverlay` 가 DOM 노드를 그대로 받으므로
+  문자열 조립이 필요 없다 — 이스케이프를 빠뜨릴 자리를 아예 만들지 않는다.
 - 사용자에게 보이는 오류 메시지는 **무엇이 잘못됐고 무엇을 하면 되는지**를 한국어로 말한다.
   "알 수 없는 오류" 같은 문구를 남기지 않는다.
 - 외부 호출에는 타임아웃과 중복 실행 방지를 붙인다.
