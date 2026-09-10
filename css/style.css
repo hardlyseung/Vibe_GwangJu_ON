@@ -881,13 +881,6 @@ h1, h2, h3, h4 {
   line-height: var(--lh-relaxed);
 }
 
-/* 카카오 InfoWindow 내부 — 문자열 HTML로만 들어가므로 여기서만 손댄다. */
-.iw {
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-
 /* ══════════════════════════════════════════════════════════════════════
    거점 상세
    ══════════════════════════════════════════════════════════════════════ */
@@ -1649,6 +1642,109 @@ h1, h2, h3, h4 {
 /* AI가 고른 이유가 길 수 있다. 가로로 넘치게 두지 않는다. */
 .discover-msg {
   overflow-wrap: anywhere;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   마커 팝업 — 지도 위에 뜨는 카드
+
+   CustomOverlay 는 DOM 노드를 그대로 받으므로 나머지 카드와 같은 토큰을 쓴다.
+   지도 타일은 항상 밝지만 팝업은 페이지 테마를 따른다 — 다크모드에서 이 카드만
+   희게 남으면 페이지에서 혼자 튄다.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.map-popup {
+  position: relative;
+  width: 264px;
+  max-width: 76vw;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  text-align: left;
+}
+
+/* 어느 핀에서 나온 팝업인지 가리키는 꼬리. */
+.map-popup::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--surface-raised);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.map-popup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.map-popup-name {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  line-height: var(--lh-snug);
+}
+
+.map-popup-close {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin: -6px -6px 0 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-popup-close:hover {
+  background: var(--surface-sunk);
+  color: var(--text);
+}
+
+.map-popup-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.map-popup-summary {
+  margin: 0 0 var(--space-3);
+  color: var(--text-mid);
+  line-height: var(--lh-relaxed);
+}
+
+.map-popup-warn {
+  margin: 0 0 var(--space-3);
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+
+.map-popup-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* 팝업 안에서는 버튼 두 개가 나란히 들어가야 하므로 기본 .btn 보다 조밀하게. */
+.map-popup-btn {
+  flex: 1;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-xs);
 }
 
 /* ══════════════════════════════════════════════════════════════════════

@@ -44,6 +44,7 @@ const state = {
   // 자연어 탐색 결과. null = 적용 안 됨, 배열 = AI(또는 폴백)가 고른 거점 id 순서대로
   discoverIds: null,
   discovering: false,
+  mapPopup: null, // 열려 있는 마커 팝업(CustomOverlay). 한 번에 하나만 띄운다.
 };
 
 // 무엇을 입력해야 할지 모르면 입력창은 비어 있는 채로 남는다. 예시를 눌러서 시작할 수 있게 한다.
@@ -159,6 +160,8 @@ function setupMap() {
           ),
           level: selected ? 5 : 8,
         });
+        // 지도 빈 곳을 누르면 열려 있는 팝업을 닫는다.
+        kakao.maps.event.addListener(state.map, "click", closeMapPopup);
         renderMarkers(visibleSpots());
       } catch (err) {
         console.error("[map] 초기화 실패", err);
@@ -171,32 +174,107 @@ function setupMap() {
   }
 }
 
+/* ---------- 마커 모양 ----------
+   기본 마커는 전부 같은 빨간 핀이라 지도만 봐서는 어떤 성격의 장소인지 알 수 없다.
+   테마별로 색을 나눠 두면 목록을 읽지 않고도 "이 동네는 서원이 많구나"가 보인다.
+   색만으로 구분하지 않도록 선택 상태는 크기와 흰 테두리로도 표시한다. */
+
+const THEME_MARKER_COLORS = {
+  "호국·의병 유적": "#2a6b5b",
+  "민주화·독립운동": "#1d5a94",
+  "서원·향교·누각": "#9a6420",
+  "박물관·체험": "#6a4c93",
+};
+const MARKER_COLOR_DEFAULT = "#4a515a";
+// 좌표가 광주 경계 밖인 거점은 지도에서도 바로 눈에 띄어야 한다.
+const MARKER_COLOR_SUSPECT = "#8a5a06";
+
+function markerColorFor(spot) {
+  if (coordStatus(spot) === "suspect") return MARKER_COLOR_SUSPECT;
+  return THEME_MARKER_COLORS[spot.theme] || MARKER_COLOR_DEFAULT;
+}
+
+// 핀을 SVG 로 직접 그려 data URI 로 넘긴다. 이미지 파일을 두지 않으므로
+// 색을 바꾸는 데 에셋 추가·배포가 필요 없고, 어떤 배율에서도 또렷하다.
+function markerSvg(color, selected) {
+  const ring = selected
+    ? '<circle cx="16" cy="15" r="12" fill="none" stroke="#fff" stroke-width="2.5" opacity="0.95"/>'
+    : "";
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 42">' +
+    '<path d="M16 41C16 41 30 25.5 30 15A14 14 0 1 0 2 15c0 10.5 14 26 14 26z" fill="' +
+    color +
+    '" stroke="#ffffff" stroke-width="2"/>' +
+    '<circle cx="16" cy="15" r="5.5" fill="#ffffff"/>' +
+    ring +
+    "</svg>";
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
+function markerImageFor(spot, selected) {
+  // MarkerImage 를 제공하지 않는 환경이면 기본 마커로 둔다 — 지도가 아예 안 뜨는 것보다 낫다.
+  if (typeof kakao.maps.MarkerImage !== "function") return null;
+
+  const w = selected ? 38 : 30;
+  const h = selected ? 50 : 39;
+  try {
+    return new kakao.maps.MarkerImage(
+      markerSvg(markerColorFor(spot), selected),
+      new kakao.maps.Size(w, h),
+      // 핀 끝(아래 가운데)이 실제 좌표에 닿아야 위치가 어긋나 보이지 않는다.
+      { offset: new kakao.maps.Point(w / 2, h) }
+    );
+  } catch (err) {
+    console.warn("[map] 마커 이미지 생성 실패 — 기본 마커를 씁니다", err);
+    return null;
+  }
+}
+
 function clearMarkers() {
-  state.markers.forEach((m) => m.setMap(null));
+  state.markers.forEach((entry) => entry.marker.setMap(null));
   state.markers = [];
+}
+
+// 선택이 바뀌었을 때 마커를 다시 만들지 않고 이미지만 갈아끼운다.
+// 다시 만들면 열려 있던 팝업이 함께 사라진다.
+function refreshMarkerStyles() {
+  if (!state.markers.length) return;
+  state.markers.forEach((entry) => {
+    const selected = !!(state.selected && state.selected.id === entry.spot.id);
+    if (entry.selected === selected) return;
+    entry.selected = selected;
+    const image = markerImageFor(entry.spot, selected);
+    if (image) entry.marker.setImage(image);
+    // 선택한 핀이 다른 핀에 가리지 않도록 위로 올린다.
+    if (typeof entry.marker.setZIndex === "function") entry.marker.setZIndex(selected ? 10 : 1);
+  });
 }
 
 function renderMarkers(spots) {
   if (!state.map) return;
+  closeMapPopup();
   clearMarkers();
 
   spots.forEach((spot) => {
     if (coordStatus(spot) === "missing") return;
 
     const position = new kakao.maps.LatLng(spot.lat, spot.lng);
-    const marker = new kakao.maps.Marker({ position, map: state.map });
-    const infowindow = new kakao.maps.InfoWindow({
-      content: `<div class="iw">${escapeHtml(spot.name)}</div>`,
-    });
+    const selected = !!(state.selected && state.selected.id === spot.id);
+    const image = markerImageFor(spot, selected);
 
-    kakao.maps.event.addListener(marker, "mouseover", () => infowindow.open(state.map, marker));
-    kakao.maps.event.addListener(marker, "mouseout", () => infowindow.close());
+    const options = { position, map: state.map, title: spot.name };
+    if (image) options.image = image;
+    const marker = new kakao.maps.Marker(options);
+
     kakao.maps.event.addListener(marker, "click", () => {
       state.map.panTo(position);
-      selectSpot(spot);
+      // 팝업이 지도 위에 떠 있으므로 상세 패널로 화면을 옮기지 않는다.
+      // 옮기면 방금 연 팝업이 화면 밖으로 밀려난다. 이동은 팝업의 버튼이 맡는다.
+      selectSpot(spot, { reveal: false });
+      openMapPopup(spot, position);
     });
 
-    state.markers.push(marker);
+    state.markers.push({ spot, marker, selected });
   });
 }
 
@@ -226,11 +304,81 @@ function fitMapTo(spots) {
   }
 }
 
-// 카카오 InfoWindow는 문자열 HTML만 받으므로 이 경로에서만 이스케이프가 필요하다.
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) => {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+/* ---------- 마커 팝업 ----------
+   InfoWindow 는 문자열 HTML 만 받아 데이터를 끼워 넣어야 하지만, CustomOverlay 는
+   DOM 노드를 그대로 받는다. el() 로 만들어 넘기면 문자열 조립이 없어 이스케이프도 필요 없다. */
+
+function closeMapPopup() {
+  if (state.mapPopup) {
+    state.mapPopup.setMap(null);
+    state.mapPopup = null;
+  }
+}
+
+function buildMapPopup(spot) {
+  const box = el("div", "map-popup");
+
+  const head = el("div", "map-popup-head");
+  head.appendChild(el("strong", "map-popup-name", spot.name));
+
+  const close = el("button", "map-popup-close", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", "닫기");
+  close.addEventListener("click", closeMapPopup);
+  head.appendChild(close);
+  box.appendChild(head);
+
+  const badges = el("div", "map-popup-badges");
+  badges.appendChild(el("span", "badge", spot.district));
+  badges.appendChild(el("span", "badge", spot.theme));
+  box.appendChild(badges);
+
+  if (isFilled(spot.summary)) {
+    box.appendChild(el("p", "map-popup-summary", spot.summary));
+  }
+
+  if (coordStatus(spot) === "suspect") {
+    box.appendChild(el("p", "map-popup-warn", "등록된 좌표가 광주 경계 밖입니다."));
+  }
+
+  const actions = el("div", "map-popup-actions");
+
+  const more = el("button", "btn btn-primary map-popup-btn", "상세 보기");
+  more.type = "button";
+  more.addEventListener("click", () => {
+    closeMapPopup();
+    revealDetail();
   });
+  actions.appendChild(more);
+
+  const route = el("a", "btn map-popup-btn", "길찾기");
+  route.href = directionsHref(spot);
+  route.target = "_blank";
+  route.rel = "noopener";
+  actions.appendChild(route);
+
+  box.appendChild(actions);
+  return box;
+}
+
+function openMapPopup(spot, position) {
+  if (!state.map || typeof kakao.maps.CustomOverlay !== "function") return;
+  closeMapPopup();
+
+  try {
+    state.mapPopup = new kakao.maps.CustomOverlay({
+      position,
+      content: buildMapPopup(spot),
+      // 핀 위에 뜨도록. 1이면 팝업 아래끝이 좌표에 붙어 핀을 가린다.
+      yAnchor: 1.35,
+      zIndex: 20,
+    });
+    state.mapPopup.setMap(state.map);
+  } catch (err) {
+    // 팝업이 없어도 상세 패널에 같은 내용이 이미 들어가 있다. 조용히 넘어간다.
+    console.warn("[map] 팝업을 열지 못했습니다", err);
+    state.mapPopup = null;
+  }
 }
 
 /* ---------- 목록 · 필터 ---------- */
@@ -639,7 +787,7 @@ function scrollToList() {
   }
 }
 
-function selectSpot(spot) {
+function selectSpot(spot, options) {
   // 거점을 바꾸면 이전 거점에 대한 요청은 버린다.
   // 그대로 두면 앞선 답변이 새 거점 화면에 도착한다.
   if (state.pendingAsk) {
@@ -650,9 +798,11 @@ function selectSpot(spot) {
   state.selected = spot;
   renderSpotList();
   renderDetail(spot);
+  refreshMarkerStyles();
   document.getElementById("ai-answer").textContent = "";
   clearHandoff();
-  revealDetail();
+  // 마커에서 고른 경우에는 팝업이 지도 위에 떠 있으므로 화면을 옮기지 않는다.
+  if (!options || options.reveal !== false) revealDetail();
 
   // 주소창을 갱신해 두면 이 화면 그대로 공유·재방문할 수 있다.
   // file:// 등 일부 환경에서는 replaceState가 막히므로 실패해도 넘어간다.
