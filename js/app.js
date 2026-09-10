@@ -200,6 +200,32 @@ function renderMarkers(spots) {
   });
 }
 
+// 고른 거점들이 한눈에 들어오도록 지도 시점을 맞춘다.
+// 이게 없으면 목록만 3곳으로 줄고 지도는 광주 전체를 비춘 채라, 마커가 사라진 것처럼만 보인다.
+function fitMapTo(spots) {
+  // 지도가 실패했거나 SDK가 부분만 로드된 경우에도 목록·AI는 계속 동작해야 한다.
+  if (!state.map || typeof kakao === "undefined" || !kakao.maps) return;
+  if (typeof kakao.maps.LatLngBounds !== "function") return;
+
+  const points = spots.filter((s) => coordStatus(s) !== "missing");
+  if (!points.length) return;
+
+  // 한 곳뿐이면 bounds 가 점 하나라 최대 배율까지 당겨져 주변 맥락이 사라진다. 이동만 한다.
+  if (points.length === 1) {
+    state.map.panTo(new kakao.maps.LatLng(points[0].lat, points[0].lng));
+    return;
+  }
+
+  try {
+    const bounds = new kakao.maps.LatLngBounds();
+    points.forEach((s) => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
+    state.map.setBounds(bounds);
+  } catch (err) {
+    // 시점 조정에 실패해도 마커는 이미 그려져 있다. 지도를 건드리지 않고 넘어간다.
+    console.warn("[map] 시점 조정 실패 — 지도는 그대로 둡니다", err);
+  }
+}
+
 // 카카오 InfoWindow는 문자열 HTML만 받으므로 이 경로에서만 이스케이프가 필요하다.
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) => {
@@ -370,7 +396,11 @@ function clearDiscover() {
   if (input) input.value = "";
   setDiscoverStatus("");
   renderSpotList();
-  renderMarkers(visibleSpots());
+
+  // 추천을 풀면 지도도 원래대로 — 18곳이 다 보이는 시점으로 되돌린다.
+  const all = visibleSpots();
+  renderMarkers(all);
+  fitMapTo(all);
 }
 
 // 추천 결과를 목록·지도에 반영한다. 경쟁하는 다른 필터는 풀어준다 —
@@ -385,7 +415,11 @@ function applyDiscoverIds(ids, message) {
 
   renderThemeFilters();
   renderSpotList();
-  renderMarkers(visibleSpots());
+
+  const shown = visibleSpots();
+  renderMarkers(shown);
+  fitMapTo(shown);
+
   setLocationStatus("");
   setDiscoverStatus(message, true);
   revealDiscover();
@@ -435,7 +469,9 @@ function applyKeywordFallback(query, note) {
   if (!matched.length) {
     state.discoverIds = null;
     renderSpotList();
-    renderMarkers(visibleSpots());
+    const all = visibleSpots();
+    renderMarkers(all);
+    fitMapTo(all);
     setDiscoverStatus(
       note
         ? `${note} 그리고 '${query}'에 맞는 거점도 찾지 못했습니다.`
