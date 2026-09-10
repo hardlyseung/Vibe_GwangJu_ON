@@ -33,11 +33,11 @@
     },
     {
       "id": "exhibitions",
-      "name": "김대중컨벤션센터 전시·행사 개최 현황",
+      "name": "김대중컨벤션센터 연도별 전시장 이용현황",
       "provider": "광주광역시관광공사",
       "format": "CSV",
       "source_date": "2026-06-08",
-      "url": "TODO 공공데이터포털 상세 페이지 주소",
+      "url": "https://www.data.go.kr/data/15075731/fileData.do",
       "record_key": "exhibitions",
       "record_unit": "건",
       "powers": [

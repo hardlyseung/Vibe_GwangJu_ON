@@ -1,8 +1,11 @@
-// 광주광역시관광공사_주관전시회 개최 현황 CSV -> data/exhibitions.json 변환기 (Node 18+)
+// 광주광역시관광공사 전시·행사 개최 현황 CSV -> data/exhibitions.json 변환기 (Node 18+)
+//
+// 확인된 원본: 광주광역시관광공사_김대중컨벤션센터 연도별 전시장 이용현황
+//              https://www.data.go.kr/data/15075731/fileData.do
 //
 //   node scripts/convert-exhibitions.js <내려받은_CSV_경로> [--facility=시설명]
 //
-// --facility 는 "장소" 칸에 홀 이름만 적힌 배포본(예: 김대중컨벤션센터 이용현황)에서 쓴다.
+// --facility 는 "장소" 칸에 홀 이름만 적힌 배포본(위 이용현황이 그렇다)에서 쓴다.
 // 그 파일의 모든 행은 한 시설 안에서 열린 행사라서, 시설명을 밖에서 한 번 지정해야
 // 자치구를 붙일 수 있다. 추측으로 채우지 않고 실행하는 사람이 명시하게 두는 이유다.
 //
