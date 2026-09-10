@@ -41,7 +41,13 @@ const state = {
   pendingAsk: null, // 진행 중인 /api/chat 요청의 AbortController
   userPos: null, // 위치 권한을 허용했을 때만 채워진다
   sortByDistance: false,
+  // 자연어 탐색 결과. null = 적용 안 됨, 배열 = AI(또는 폴백)가 고른 거점 id 순서대로
+  discoverIds: null,
+  discovering: false,
 };
+
+// 무엇을 입력해야 할지 모르면 입력창은 비어 있는 채로 남는다. 예시를 눌러서 시작할 수 있게 한다.
+const DISCOVER_EXAMPLES = ["아이와 함께", "5·18 발자취", "서원·향교", "박물관 위주"];
 
 /* ---------- DOM 유틸 ---------- */
 
@@ -204,7 +210,16 @@ function escapeHtml(text) {
 /* ---------- 목록 · 필터 ---------- */
 
 function visibleSpots() {
-  let filtered = state.spots.slice();
+  // AI 추천이 적용돼 있으면 그 결과가 목록의 출발점이다. 순서도 AI가 매긴 순서를 지킨다 —
+  // 원본 순서로 되돌리면 "가장 잘 맞는 곳이 맨 위"라는 정보가 사라진다.
+  let filtered;
+  if (Array.isArray(state.discoverIds)) {
+    const byId = new Map(state.spots.map((s) => [Number(s.id), s]));
+    filtered = state.discoverIds.map((id) => byId.get(Number(id))).filter(Boolean);
+  } else {
+    filtered = state.spots.slice();
+  }
+
   if (state.activeTheme) filtered = filtered.filter((s) => s.theme === state.activeTheme);
   if (state.districtFilter) filtered = filtered.filter((s) => s.district === state.districtFilter);
 
@@ -243,6 +258,10 @@ function renderThemeFilters() {
       const index = [...e.currentTarget.parentNode.children].indexOf(e.currentTarget);
       state.activeTheme = theme;
       state.districtFilter = null; // 테마를 고르면 자치구 한정은 푼다
+      // 테마를 직접 고른다는 건 AI 추천을 그만 보겠다는 뜻이다. 둘이 겹치면
+      // 목록이 왜 이렇게 나왔는지 설명할 수 없다.
+      state.discoverIds = null;
+      setDiscoverStatus("");
       renderThemeFilters();
       renderSpotList();
       renderMarkers(visibleSpots());
@@ -314,6 +333,214 @@ function renderSpotList() {
     li.appendChild(btn);
     list.appendChild(li);
   });
+}
+
+/* ---------- 자연어 탐색 (AI가 필터를 대신 걸어준다) ----------
+   지금까지는 사용자가 테마를 고르고 검색어를 넣어 18곳을 직접 좁혀야 했다.
+   AI가 그 판단을 대신 하면 "아이랑 반나절"처럼 데이터에 없는 말로도 찾을 수 있다.
+   단, AI가 죽어도 탐색 자체는 살아야 하므로 실패하면 규칙 기반 검색으로 넘어간다. */
+
+function setDiscovering(on) {
+  state.discovering = on;
+  const btn = document.getElementById("discover-btn");
+  if (!btn) return;
+  btn.disabled = on;
+  btn.textContent = on ? "찾는 중" : "AI 추천";
+}
+
+function setDiscoverStatus(message, withReset) {
+  const box = document.getElementById("discover-result");
+  if (!box) return;
+  clear(box);
+  if (!message) return;
+
+  box.appendChild(el("span", "discover-msg", message));
+
+  if (withReset) {
+    const reset = el("button", "linkish", "전체 보기");
+    reset.type = "button";
+    reset.addEventListener("click", clearDiscover);
+    box.appendChild(reset);
+  }
+}
+
+function clearDiscover() {
+  state.discoverIds = null;
+  const input = document.getElementById("discover-input");
+  if (input) input.value = "";
+  setDiscoverStatus("");
+  renderSpotList();
+  renderMarkers(visibleSpots());
+}
+
+// 추천 결과를 목록·지도에 반영한다. 경쟁하는 다른 필터는 풀어준다 —
+// 테마 칩이 켜진 채로 추천이 겹치면 왜 이 목록이 나왔는지 설명할 수 없다.
+function applyDiscoverIds(ids, message) {
+  state.discoverIds = ids;
+  state.activeTheme = null;
+  state.districtFilter = null;
+  state.search = "";
+  const search = document.getElementById("spot-search");
+  if (search) search.value = "";
+
+  renderThemeFilters();
+  renderSpotList();
+  renderMarkers(visibleSpots());
+  setLocationStatus("");
+  setDiscoverStatus(message, true);
+  revealDiscover();
+}
+
+// 추천 상자를 화면 위로 올린다. 목록(.panel-list)으로 스크롤하면 방금 받은
+// "왜 이 곳들인가" 설명이 화면 밖으로 밀려나므로, 상자 자체를 기준으로 잡는다.
+// 상자 위에서 결과 첫 줄까지가 한 화면에 들어온다.
+function revealDiscover() {
+  const box = document.querySelector(".discover");
+  if (!box) return;
+
+  requestAnimationFrame(() => {
+    const rect = box.getBoundingClientRect();
+    // 이미 위쪽에 자리잡고 있으면 다시 흔들지 않는다.
+    if (rect.top >= 0 && rect.top < window.innerHeight * 0.25) return;
+
+    try {
+      box.scrollIntoView({
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+        block: "start",
+      });
+    } catch (err) {
+      box.scrollIntoView();
+    }
+  });
+}
+
+// AI가 못 쓸 때의 대체 경로. 이름·테마·자치구·요약에서 낱말을 찾는다.
+// TODO 값은 isFilled 로 걸러 매칭 대상에서 뺀다 — 미작성 필드가 검색에 걸리면 안 된다.
+function applyKeywordFallback(query, note) {
+  const tokens = query
+    .toLowerCase()
+    .split(/[\s,·]+/)
+    .filter((t) => t.length >= 2);
+
+  const matched = tokens.length
+    ? state.spots.filter((s) => {
+        const hay = [s.name, s.theme, s.district, s.summary, s.visit_tips]
+          .filter(isFilled)
+          .join(" ")
+          .toLowerCase();
+        return tokens.some((t) => hay.includes(t));
+      })
+    : [];
+
+  if (!matched.length) {
+    state.discoverIds = null;
+    renderSpotList();
+    renderMarkers(visibleSpots());
+    setDiscoverStatus(
+      note
+        ? `${note} 그리고 '${query}'에 맞는 거점도 찾지 못했습니다.`
+        : `'${query}'에 맞는 거점을 찾지 못했습니다. 다른 말로 해보시겠어요?`
+    );
+    return;
+  }
+
+  applyDiscoverIds(
+    matched.map((s) => Number(s.id)),
+    `${note ? note + " " : ""}일반 검색으로 ${matched.length}곳을 찾았습니다.`
+  );
+}
+
+async function runDiscover() {
+  if (state.discovering) return;
+
+  const input = document.getElementById("discover-input");
+  const query = input ? input.value.trim() : "";
+  if (!query) {
+    setDiscoverStatus("찾고 싶은 조건을 입력해 주세요. 예: 아이와 함께");
+    return;
+  }
+
+  setDiscovering(true);
+  setDiscoverStatus("AI가 조건에 맞는 거점을 고르는 중입니다…");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "discover", query }),
+      signal: controller.signal,
+    });
+
+    // 정적 서버로 열었거나 배포 설정이 어긋나면 JSON 이 아니라 HTML 이 돌아온다.
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch (parseErr) {
+      payload = null;
+    }
+
+    if (!res.ok || !payload || !Array.isArray(payload.ids)) {
+      applyKeywordFallback(query, "AI 추천을 쓸 수 없어");
+      return;
+    }
+
+    // AI가 "맞는 곳 없음"이라고 했어도 낱말은 걸릴 수 있으니 한 번 더 훑는다.
+    if (!payload.ids.length) {
+      applyKeywordFallback(query, "");
+      return;
+    }
+
+    const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+    applyDiscoverIds(
+      payload.ids,
+      reason ? `${reason} (${payload.ids.length}곳)` : `${payload.ids.length}곳을 찾았습니다.`
+    );
+  } catch (err) {
+    if (err.name === "AbortError") {
+      applyKeywordFallback(query, "AI 추천이 지연되어");
+    } else {
+      console.error("[discover] 요청 실패", err);
+      applyKeywordFallback(query, "AI에 연결하지 못해");
+    }
+  } finally {
+    clearTimeout(timer);
+    setDiscovering(false);
+  }
+}
+
+function renderDiscoverExamples() {
+  const box = document.getElementById("discover-examples");
+  if (!box) return;
+  clear(box);
+
+  DISCOVER_EXAMPLES.forEach((example) => {
+    const chip = el("button", "chip chip-sm", example);
+    chip.type = "button";
+    chip.addEventListener("click", () => {
+      const input = document.getElementById("discover-input");
+      if (input) input.value = example;
+      runDiscover();
+    });
+    box.appendChild(chip);
+  });
+}
+
+function setupDiscover() {
+  const btn = document.getElementById("discover-btn");
+  const input = document.getElementById("discover-input");
+  if (btn) btn.addEventListener("click", runDiscover);
+  if (input) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runDiscover();
+      }
+    });
+  }
+  renderDiscoverExamples();
 }
 
 /* ---------- 상세 패널 ---------- */
@@ -700,6 +927,8 @@ function renderExhibitions() {
 function focusDistrict(district) {
   state.activeTheme = null;
   state.districtFilter = district;
+  state.discoverIds = null;
+  setDiscoverStatus("");
   renderThemeFilters();
   renderSpotList();
   renderMarkers(visibleSpots());
@@ -1155,6 +1384,7 @@ async function loadExhibitions() {
 
 async function main() {
   setupAiForm();
+  setupDiscover();
 
   let data;
   try {

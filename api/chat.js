@@ -38,6 +38,11 @@ try {
 const MODEL_CANDIDATES = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
 let resolvedModel = null;
 const MAX_QUESTION_LENGTH = 200;
+
+// 자연어 탐색("아이랑 반나절 코스")은 질문이 아니라 조건이므로 더 짧다.
+const MAX_QUERY_LENGTH = 100;
+// 한 번에 너무 많이 고르면 "추천"이 아니라 그냥 목록이 된다.
+const DISCOVER_MAX_RESULTS = 5;
 // Vercel Hobby 함수는 오래 걸리면 플랫폼이 먼저 끊는다.
 // 그 전에 우리가 끊어야 사용자에게 깔끔한 메시지를 돌려줄 수 있다.
 const UPSTREAM_TIMEOUT_MS = 9000;
@@ -170,6 +175,70 @@ ${personaLine}
 
 [공식 관광 자료]
 ${grounding}`;
+}
+
+/* ---------- 자연어 탐색 (AI가 필터를 대신 걸어준다) ---------- */
+
+// 모델에게 넘길 거점 카탈로그. 요약을 통째로 넣으면 18곳만으로도 프롬프트가 커져
+// 무료 할당량을 빨리 태운다. 고르는 데 필요한 만큼만 자른다.
+function buildCatalog(spots) {
+  return spots
+    .map((s) => {
+      const summary = isFilled(s.summary) ? s.summary.trim().slice(0, 60) : "";
+      // 관람 팁 유무는 "아이랑 갈 만한 곳" 같은 요청을 고를 때 실제로 쓰이는 신호다.
+      const tip = isFilled(s.visit_tips) ? " [관람팁있음]" : "";
+      return `${s.id}|${s.name}|${s.district}|${s.theme}|${summary}${tip}`;
+    })
+    .join("\n");
+}
+
+function buildDiscoverPrompt(catalog) {
+  return `당신은 "광주 ON AIR"의 거점 추천기입니다.
+관광객이 원하는 조건을 말하면, 아래 [거점 목록]에서 맞는 곳을 골라줍니다.
+
+[반드시 지킬 제약]
+1. 반드시 아래 목록에 있는 id 만 고릅니다. 목록에 없는 장소를 지어내지 않습니다.
+2. 최대 ${DISCOVER_MAX_RESULTS}곳까지 고릅니다.
+3. 조건에 맞는 곳이 없으면 ids 를 빈 배열로 둡니다. 억지로 채우지 않습니다.
+4. 광주 관광과 무관한 요청이면 ids 를 빈 배열로 둡니다.
+5. reason 은 왜 이 곳들을 골랐는지 한 문장으로만 씁니다. 목록에 없는 사실을 덧붙이지 않습니다.
+6. 아래 JSON 형식으로만 답합니다. 다른 말을 앞뒤에 붙이지 않습니다.
+
+{"ids":[1,2],"reason":"한 문장"}
+
+[거점 목록]
+id|이름|자치구|테마|요약
+${catalog}`;
+}
+
+// 모델이 ```json 울타리나 앞뒤 설명을 붙여 보내는 경우가 있다. 첫 중괄호 블록만 건져낸다.
+function extractJson(text) {
+  if (typeof text !== "string") return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch (err) {
+    return null;
+  }
+}
+
+// 모델이 돌려준 id 를 실제 데이터와 대조한다. 이 검증이 "없는 거점을 추천하는" 사고를
+// 막는 마지막 관문이다 — 프롬프트 제약만 믿지 않는다.
+function validateIds(rawIds, spots) {
+  if (!Array.isArray(rawIds)) return [];
+  const known = new Set(spots.map((s) => Number(s.id)));
+  const seen = new Set();
+  const out = [];
+  for (const raw of rawIds) {
+    const id = Number(raw);
+    if (!known.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= DISCOVER_MAX_RESULTS) break;
+  }
+  return out;
 }
 
 function sendJson(res, status, payload) {
@@ -318,6 +387,84 @@ module.exports = async (req, res) => {
   const body = parseBody(req);
   if (body === null) {
     sendJson(res, 400, { error: "요청 형식이 올바르지 않습니다." });
+    return;
+  }
+
+  // 자연어 탐색은 거점을 고르기 "전"에 부르는 것이라 placeId 가 없다.
+  // 기존 해설 경로와 완전히 갈라서 처리한다.
+  if (body.mode === "discover") {
+    const query = typeof body.query === "string" ? body.query.trim() : "";
+    if (!query) {
+      sendJson(res, 400, { error: "찾고 싶은 조건을 입력해 주세요." });
+      return;
+    }
+    if (query.length > MAX_QUERY_LENGTH) {
+      sendJson(res, 400, { error: `조건은 ${MAX_QUERY_LENGTH}자 이내로 입력해 주세요.` });
+      return;
+    }
+
+    let spots;
+    try {
+      spots = loadPlaces();
+    } catch (err) {
+      console.error("[discover] places.json 로드 실패", err);
+      sendJson(res, 500, { error: "거점 데이터를 읽을 수 없습니다." });
+      return;
+    }
+
+    const dController = new AbortController();
+    const dTimer = setTimeout(() => dController.abort(), UPSTREAM_TIMEOUT_MS);
+
+    try {
+      const upstream = await callGemini(
+        apiKey,
+        JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: query }] }],
+          systemInstruction: {
+            parts: [{ text: buildDiscoverPrompt(buildCatalog(spots)) }],
+          },
+          // 추천은 창작이 아니라 분류다. 온도를 낮춰 같은 조건에 같은 답이 나오게 한다.
+          generationConfig: { temperature: 0.1, maxOutputTokens: 400 },
+        }),
+        dController.signal
+      );
+
+      if (!upstream.ok) {
+        const detail = await upstream.text().catch(() => "");
+        console.error(`[discover] Gemini ${upstream.status}: ${detail.slice(0, 300)}`);
+        // 클라이언트는 200이 아니면 규칙 기반 검색으로 넘어간다. 상태코드만 정확히 준다.
+        sendJson(res, upstream.status === 429 ? 429 : 502, {
+          error: "AI 추천을 사용할 수 없어 일반 검색으로 찾았습니다.",
+        });
+        return;
+      }
+
+      const data = await upstream.json();
+      const candidate = data && data.candidates && data.candidates[0];
+      const text =
+        candidate &&
+        candidate.content &&
+        Array.isArray(candidate.content.parts) &&
+        candidate.content.parts.map((p) => p.text || "").join("");
+
+      const parsed = extractJson(text);
+      const ids = validateIds(parsed && parsed.ids, spots);
+      const reason =
+        parsed && typeof parsed.reason === "string" ? parsed.reason.trim().slice(0, 200) : "";
+
+      // 고른 게 없으면 그렇다고 말한다. 억지로 아무 거점이나 채우지 않는다.
+      sendJson(res, 200, { mode: "discover", ids, reason: ids.length ? reason : "" });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        console.error("[discover] 업스트림 타임아웃");
+        sendJson(res, 504, { error: "AI 추천이 지연되어 일반 검색으로 찾았습니다." });
+        return;
+      }
+      console.error("[discover] 예외", err);
+      sendJson(res, 500, { error: "서버에서 문제가 발생했습니다." });
+    } finally {
+      clearTimeout(dTimer);
+    }
     return;
   }
 

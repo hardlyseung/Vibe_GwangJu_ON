@@ -70,6 +70,24 @@
         <span class="count-label"><strong id="spot-count">–</strong> 표시 중</span>
       </div>
 
+      <!-- AI가 조건을 해석해 목록을 대신 좁혀준다. 실패하면 일반 검색으로 넘어간다. -->
+      <div class="discover">
+        <div class="discover-row">
+          <label class="sr-only" for="discover-input">원하는 조건</label>
+          <input
+            id="discover-input"
+            class="discover-input"
+            type="text"
+            maxlength="100"
+            autocomplete="off"
+            placeholder="원하는 조건을 말해보세요 — 예: 아이랑 반나절"
+          />
+          <button id="discover-btn" class="btn btn-primary" type="button">AI 추천</button>
+        </div>
+        <div id="discover-examples" class="chip-row discover-examples"></div>
+        <p id="discover-result" class="discover-result" role="status" aria-live="polite"></p>
+      </div>
+
       <div class="grid-layout">
         <div class="list-column">
           <aside class="panel panel-list">

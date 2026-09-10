@@ -1590,6 +1590,68 @@ h1, h2, h3, h4 {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   자연어 탐색 — AI가 목록을 대신 좁혀준다
+
+   목록 위에 올라앉는 입구다. 카드보다 한 단계 도드라져야 "여기서 시작한다"가
+   읽히므로 테두리와 그림자를 준다.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.discover {
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.discover-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.discover-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-base);
+}
+
+.discover-input::placeholder {
+  color: var(--text-soft);
+}
+
+.discover-examples {
+  margin-top: var(--space-3);
+}
+
+.discover-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--text-mid);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+
+.discover-result:empty {
+  display: none;
+}
+
+/* AI가 고른 이유가 길 수 있다. 가로로 넘치게 두지 않는다. */
+.discover-msg {
+  overflow-wrap: anywhere;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    반응형 마무리 — 반드시 파일 맨 끝.
 
    앞쪽 미디어쿼리에 써 두면 뒤에 나오는 같은 특이도의 기본 규칙
@@ -1624,12 +1686,18 @@ h1, h2, h3, h4 {
     min-height: 340px;
   }
 
-  .ai-input-row {
+  .ai-input-row,
+  .discover-row {
     flex-direction: column;
   }
 
-  .ai-input-row .btn {
+  .ai-input-row .btn,
+  .discover-row .btn {
     width: 100%;
+  }
+
+  .discover {
+    padding: var(--space-4);
   }
 
   .kv {
