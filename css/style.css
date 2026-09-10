@@ -1118,8 +1118,96 @@ h1, h2, h3, h4 {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   지금 광주에서 (전시)
+   언제 오면 볼거리가 많을까 (전시·행사 개최 기록)
    ══════════════════════════════════════════════════════════════════════ */
+
+.exhibition-summary {
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 12개 막대. 각각이 버튼이라 그 달의 행사 목록으로 바꿔 준다.
+   그래프를 보는 데서 끝나지 않고 눌러서 실제 행사 이름까지 가도록. */
+.month-chart {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+}
+
+.month-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-soft);
+}
+
+.month-bar:hover {
+  background: var(--surface-sunk);
+  border-color: var(--border-soft);
+}
+
+.month-bar.is-active {
+  background: var(--primary-weak);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+.month-count {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 막대의 키를 고정해야 12개의 비교 기준선이 생긴다. */
+.month-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 88px;
+  padding: 0 15%;
+}
+
+.month-fill {
+  width: 100%;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: hsl(var(--primary-300));
+  transition: background-color 0.15s ease;
+}
+
+.month-bar.is-active .month-fill,
+.month-bar:hover .month-fill {
+  background: hsl(var(--primary-600));
+}
+
+.month-name {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.exhibition-caption {
+  margin: 0 0 var(--space-4);
+  color: var(--text-mid);
+  font-size: var(--fs-sm);
+}
+
+.exhibition-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+}
+
+.exhibition-link {
+  margin-top: var(--space-5);
+}
 
 .exhibition-list {
   display: grid;
@@ -1195,10 +1283,6 @@ h1, h2, h3, h4 {
 .exhibition-card .phase-upcoming {
   background: rgb(255 255 255 / 0.22);
   color: #fff;
-}
-
-.exhibition-card .linkish {
-  color: hsl(var(--primary-200));
 }
 
 .exhibition-card :focus-visible {
@@ -1836,6 +1920,18 @@ h1, h2, h3, h4 {
 
   .hero-stat {
     gap: var(--space-6);
+  }
+
+  /* 폭 400px에서 12칸이면 한 칸이 28px이라 "10월"이 잘린다. 6칸씩 두 줄로.
+     가로 스크롤을 만드는 대신 접는 이유는, 연중 분포는 12개가 한눈에
+     같이 보여야 의미가 있기 때문이다. */
+  .month-chart {
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-2) var(--space-1);
+  }
+
+  .month-track {
+    height: 64px;
   }
 }
 

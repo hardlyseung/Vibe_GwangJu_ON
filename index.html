@@ -189,17 +189,21 @@
     </div>
   </section>
 
-  <!-- 05 · 지금 광주에서 -->
-  <section id="exhibition-band" class="section" hidden>
+  <!-- 05 · 언제 오면 볼거리가 많을까 -->
+  <section id="exhibition-band" class="section" aria-labelledby="exhibition-heading" hidden>
     <div class="grid-container">
       <div class="section-heading">
         <div>
-          <span class="section-kicker">05 · NOW IN GWANGJU</span>
-          <h2 class="section-title">지금 광주에서</h2>
-          <p class="section-description">광주관광공사 주관 전시회 일정입니다.</p>
+          <span class="section-kicker">05 · WHEN TO VISIT</span>
+          <h2 class="section-title" id="exhibition-heading">언제 오면 볼거리가 많을까</h2>
+          <p class="section-description" id="exhibition-note"></p>
         </div>
       </div>
+      <p class="exhibition-summary" id="exhibition-summary"></p>
+      <div id="exhibition-months" class="month-chart" role="group" aria-label="월별 행사 개최 건수"></div>
+      <p class="exhibition-caption" id="exhibition-caption" role="status" aria-live="polite"></p>
       <div id="exhibition-list" class="exhibition-list"></div>
+      <div id="exhibition-link" class="exhibition-link"></div>
     </div>
   </section>
 

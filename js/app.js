@@ -27,6 +27,7 @@ const state = {
   raw: null,
   spots: [],
   exhibitions: [],
+  exhibitionMonth: null,
   themes: [],
   datasets: [],
   activeTheme: null,
@@ -1024,7 +1025,10 @@ function applyNearbySort() {
   renderSpotList();
 }
 
-/* ---------- 지금 광주에서 (전시회) ---------- */
+/* ---------- 언제 오면 볼거리가 많을까 (전시·행사 개최 기록) ---------- */
+
+const EXHIBITION_LIST_LIMIT = 6;
+const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
 function todayIso() {
   const d = new Date();
@@ -1039,82 +1043,81 @@ function exhibitionPhase(ex, today) {
 }
 
 function formatPeriod(ex) {
+  const dot = (d) => String(d).replace(/-/g, ".");
   if (!ex.start_date && !ex.end_date) return "일정 미정";
-  const trim = (d) => (d ? d.replace(/^\d{4}-/, "").replace("-", ".") : "?");
-  return `${trim(ex.start_date)} ~ ${trim(ex.end_date)}`;
+  if (!ex.start_date) return `~ ${dot(ex.end_date)}`;
+  if (!ex.end_date || ex.end_date === ex.start_date) return dot(ex.start_date);
+  // 16년치를 한 화면에서 보므로 시작일에는 연도가 꼭 있어야 한다.
+  // 대신 같은 해에 끝나면 종료일의 연도는 뺀다 — 읽는 데 방해만 된다.
+  const tail = ex.end_date.slice(0, 4) === ex.start_date.slice(0, 4) ? dot(ex.end_date.slice(5)) : dot(ex.end_date);
+  return `${dot(ex.start_date)} ~ ${tail}`;
 }
 
-function renderExhibitions() {
-  const band = document.getElementById("exhibition-band");
+// 시작일의 월(1~12)만 본다. 여러 달에 걸친 행사는 드물고,
+// 걸쳐 있는 달마다 한 건씩 세면 합계가 실제 개최 건수보다 커진다.
+function monthOf(ex) {
+  if (!ex.start_date) return null;
+  const m = Number(ex.start_date.slice(5, 7));
+  return m >= 1 && m <= 12 ? m : null;
+}
+
+function monthlyCounts(list) {
+  const counts = new Array(12).fill(0);
+  list.forEach((ex) => {
+    const m = monthOf(ex);
+    if (m) counts[m - 1] += 1;
+  });
+  return counts;
+}
+
+function exhibitionYearRange(list) {
+  const years = list.map((ex) => (ex.start_date ? ex.start_date.slice(0, 4) : "")).filter(Boolean).sort();
+  if (!years.length) return "";
+  return years[0] === years[years.length - 1] ? years[0] : `${years[0]}~${years[years.length - 1]}`;
+}
+
+// 고른 달의 행사를 최근 순으로. 같은 달을 16년치 겹쳐 보는 화면이라
+// 연도가 최신인 것부터 보여야 "요즘 이 달에는 뭐가 열리나"를 알 수 있다.
+function exhibitionsInMonth(list, month) {
+  return list
+    .filter((ex) => monthOf(ex) === month)
+    .sort((a, b) => String(b.start_date || "").localeCompare(String(a.start_date || "")));
+}
+
+function renderExhibitionRows(rows, today) {
   const box = document.getElementById("exhibition-list");
-
-  // 아직 CSV를 변환하지 않았으면 이 영역 자체를 감춘다. 빈 섹션을 보여주지 않는다.
-  if (!state.exhibitions.length) {
-    band.hidden = true;
-    return;
-  }
-
-  const today = todayIso();
-  const ranked = state.exhibitions
-    .map((ex) => ({ ex, phase: exhibitionPhase(ex, today) }))
-    .filter((row) => row.phase !== "past")
-    .sort((a, b) => {
-      const order = { ongoing: 0, upcoming: 1, unknown: 2 };
-      if (order[a.phase] !== order[b.phase]) return order[a.phase] - order[b.phase];
-      return String(a.ex.start_date || "").localeCompare(String(b.ex.start_date || ""));
-    });
-
-  // 진행 중·예정이 하나도 없으면 최근 것이라도 보여준다 (과거 데이터만 있는 경우).
-  const rows = ranked.length
-    ? ranked.slice(0, 6)
-    : state.exhibitions
-        .slice()
-        .sort((a, b) => String(b.start_date || "").localeCompare(String(a.start_date || "")))
-        .slice(0, 3)
-        .map((ex) => ({ ex, phase: "past" }));
-
-  if (!rows.length) {
-    band.hidden = true;
-    return;
-  }
-
-  band.hidden = false;
+  if (!box) return;
   clear(box);
 
-  const phaseLabel = { ongoing: "진행 중", upcoming: "예정", past: "종료", unknown: "일정 미정" };
+  const phaseLabel = { ongoing: "진행 중", upcoming: "예정", past: "지난 행사", unknown: "일정 미상" };
 
-  rows.forEach(({ ex, phase }) => {
+  if (!rows.length) {
+    box.appendChild(el("p", "exhibition-empty", "이 달에는 기록된 행사가 없습니다. 다른 달을 눌러 보세요."));
+    return;
+  }
+
+  rows.forEach((ex) => {
+    const phase = exhibitionPhase(ex, today);
     const card = el("article", "exhibition-card");
 
     const top = el("div", "exhibition-top");
     top.appendChild(el("span", `badge phase-${phase}`, phaseLabel[phase]));
-    // 날짜가 아예 없으면 뱃지가 이미 "일정 미정"이라, 기간까지 같은 문구로 찍으면 두 번 나온다.
-    if (phase !== "unknown") {
-      top.appendChild(el("span", "exhibition-period", formatPeriod(ex)));
-    }
+    if (phase !== "unknown") top.appendChild(el("span", "exhibition-period", formatPeriod(ex)));
     card.appendChild(top);
 
     card.appendChild(el("h3", "exhibition-name", ex.name));
-    if (ex.venue) card.appendChild(el("p", "exhibition-venue", ex.venue));
+
+    const place = [ex.facility, ex.venue].filter(isFilled).join(" · ");
+    if (place) card.appendChild(el("p", "exhibition-venue", place));
 
     const facts = [];
-    if (ex.items) facts.push(ex.items);
+    if (isFilled(ex.host)) facts.push(`주최·주관 ${ex.host}`);
+    if (isFilled(ex.items)) facts.push(ex.items);
     if (ex.booths) facts.push(`부스 ${ex.booths}개`);
     if (ex.companies) facts.push(`참여 ${ex.companies}개사`);
     if (facts.length) card.appendChild(el("p", "exhibition-facts", facts.join(" · ")));
 
-    // 두 데이터셋을 잇는 지점: 전시 장소의 자치구로 해설 거점을 연결한다.
-    if (ex.district) {
-      const nearby = state.spots.filter((s) => s.district === ex.district);
-      if (nearby.length) {
-        const link = el("button", "linkish", `${ex.district}의 해설 거점 ${nearby.length}곳 보기`);
-        link.type = "button";
-        link.addEventListener("click", () => focusDistrict(ex.district));
-        card.appendChild(link);
-      }
-    }
-
-    if (ex.website) {
+    if (isFilled(ex.website)) {
       const site = el("a", "exhibition-site", "전시 홈페이지");
       site.href = ex.website;
       site.target = "_blank";
@@ -1124,6 +1127,114 @@ function renderExhibitions() {
 
     box.appendChild(card);
   });
+}
+
+function selectExhibitionMonth(month) {
+  state.exhibitionMonth = month;
+
+  // 막대를 다시 만들지 않고 눌린 표시만 바꾼다. 다시 만들면 방금 누른 버튼이
+  // 사라지면서 키보드 포커스가 문서로 튕긴다.
+  const chart = document.getElementById("exhibition-months");
+  if (chart) {
+    Array.prototype.forEach.call(chart.children, (bar) => {
+      const on = Number(bar.dataset.month) === month;
+      bar.classList.toggle("is-active", on);
+      bar.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  const rows = exhibitionsInMonth(state.exhibitions, month);
+  const caption = document.getElementById("exhibition-caption");
+  if (caption) {
+    caption.textContent = rows.length
+      ? `${MONTH_LABELS[month - 1]}에는 지금까지 ${rows.length}건이 열렸습니다. 최근 순으로 ${Math.min(rows.length, EXHIBITION_LIST_LIMIT)}건입니다.`
+      : `${MONTH_LABELS[month - 1]}에는 기록된 행사가 없습니다.`;
+  }
+
+  renderExhibitionRows(rows.slice(0, EXHIBITION_LIST_LIMIT), todayIso());
+}
+
+function renderExhibitions() {
+  const band = document.getElementById("exhibition-band");
+  if (!band) return;
+
+  // 아직 CSV를 변환하지 않았으면 이 영역 자체를 감춘다. 빈 섹션을 보여주지 않는다.
+  if (!state.exhibitions.length) {
+    band.hidden = true;
+    return;
+  }
+
+  const today = todayIso();
+  const counts = monthlyCounts(state.exhibitions);
+  const total = state.exhibitions.length;
+  const range = exhibitionYearRange(state.exhibitions);
+  const max = Math.max.apply(null, counts);
+  if (!max) {
+    band.hidden = true;
+    return;
+  }
+
+  band.hidden = false;
+
+  // 설명줄: 이 화면이 예고가 아니라 기록이라는 걸 제목 옆에서 못 박는다.
+  const note = document.getElementById("exhibition-note");
+  if (note) {
+    const facility = state.exhibitions.find((ex) => isFilled(ex.facility));
+    const where = facility ? `${facility.facility}(${facility.district || "광주"})` : "광주";
+    note.textContent = `${where}에서 ${range}년에 실제로 열린 ${total.toLocaleString("ko-KR")}건을 시작 월로 셌습니다. 앞으로의 일정 예고가 아니라 지난 개최 기록입니다.`;
+  }
+
+  const busiest = counts.indexOf(max) + 1;
+  const min = Math.min.apply(null, counts);
+  const quietest = counts.indexOf(min) + 1;
+  const summary = document.getElementById("exhibition-summary");
+  if (summary) {
+    summary.textContent = `가장 붐빈 달은 ${MONTH_LABELS[busiest - 1]}(${max}건), 가장 한산한 달은 ${MONTH_LABELS[quietest - 1]}(${min}건)입니다.`;
+  }
+
+  const chart = document.getElementById("exhibition-months");
+  if (chart) {
+    clear(chart);
+    counts.forEach((count, i) => {
+      const month = i + 1;
+      const bar = el("button", "month-bar");
+      bar.type = "button";
+      bar.dataset.month = String(month);
+      bar.setAttribute("aria-pressed", "false");
+      bar.setAttribute("aria-label", `${MONTH_LABELS[i]} ${count}건 보기`);
+
+      const fill = el("span", "month-fill");
+      // 0건인 달도 눌러 볼 수 있게 바닥 높이를 남긴다.
+      fill.style.height = `${Math.max(6, Math.round((count / max) * 100))}%`;
+      const track = el("span", "month-track");
+      track.appendChild(fill);
+
+      bar.appendChild(el("span", "month-count", String(count)));
+      bar.appendChild(track);
+      bar.appendChild(el("span", "month-name", MONTH_LABELS[i]));
+
+      bar.addEventListener("click", () => selectExhibitionMonth(month));
+      chart.appendChild(bar);
+    });
+  }
+
+  // 두 데이터셋을 잇는 지점: 행사장 자치구로 해설 거점을 연결한다.
+  const linkBox = document.getElementById("exhibition-link");
+  if (linkBox) {
+    clear(linkBox);
+    const district = (state.exhibitions.find((ex) => isFilled(ex.district)) || {}).district;
+    const nearby = district ? state.spots.filter((s) => s.district === district) : [];
+    if (nearby.length) {
+      const link = el("button", "linkish", `행사장이 있는 ${district}의 해설 거점 ${nearby.length}곳 보기`);
+      link.type = "button";
+      link.addEventListener("click", () => focusDistrict(district));
+      linkBox.appendChild(link);
+    }
+  }
+
+  // 처음에는 이번 달을 보여준다. 지금 광주에 있는 사람에게 가장 가까운 질문이다.
+  const current = Number(today.slice(5, 7));
+  selectExhibitionMonth(state.exhibitionMonth || current);
 }
 
 // 전시 카드에서 자치구를 눌렀을 때 목록·지도를 그 자치구로 좁힌다.
@@ -1205,7 +1316,8 @@ function renderDatasets() {
     if (ds.provider) card.appendChild(el("p", "dataset-provider", ds.provider));
 
     card.appendChild(
-      el("p", "dataset-count", `${recordCount(ds)}${ds.record_unit || "건"}`)
+      // 1,499건은 세 자리마다 끊어야 한 눈에 규모가 읽힌다.
+      el("p", "dataset-count", `${recordCount(ds).toLocaleString("ko-KR")}${ds.record_unit || "건"}`)
     );
 
     if (Array.isArray(ds.powers) && ds.powers.length) {
@@ -1215,7 +1327,8 @@ function renderDatasets() {
       card.appendChild(ul);
     }
 
-    if (ds.url) {
+    // TODO 로 남겨둔 주소를 링크로 걸면 눌러도 아무 데도 못 간다.
+    if (isFilled(ds.url)) {
       const link = el("a", "dataset-link", "원본 데이터 보기");
       link.href = ds.url;
       link.target = "_blank";

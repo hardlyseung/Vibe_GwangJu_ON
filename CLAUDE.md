@@ -63,9 +63,9 @@ js/app.js           지도·필터·목록·상세·전시·AI 추천·AI 호출
 api/chat.js         서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리
 vercel.json         보안 헤더 (빌드 설정은 없다)
 data/places.json    거점 18곳 + 데이터셋 선언 + 검증 기록
-data/exhibitions.json  전시회 (변환 전에는 빈 배열)
+data/exhibitions.json  전시·행사 개최 기록 (변환 전에는 빈 배열)
 scripts/geocode.js             주소 → 좌표 (카카오 로컬 API)
-scripts/convert-exhibitions.js 전시회 CSV → JSON
+scripts/convert-exhibitions.js 전시·행사 CSV → JSON (--facility 로 시설 지정)
 tests/origin.js     /api/chat 출처 검증 점검 (의존성 없음)
 tests/security.js   보안 방어 자동 점검 (의존성 없음)
 README.md           프로젝트 소개 · 실행 · 배포 · 알려진 한계

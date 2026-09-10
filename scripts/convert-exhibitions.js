@@ -1,6 +1,10 @@
 // 광주광역시관광공사_주관전시회 개최 현황 CSV -> data/exhibitions.json 변환기 (Node 18+)
 //
-//   node scripts/convert-exhibitions.js <내려받은_CSV_경로>
+//   node scripts/convert-exhibitions.js <내려받은_CSV_경로> [--facility=시설명]
+//
+// --facility 는 "장소" 칸에 홀 이름만 적힌 배포본(예: 김대중컨벤션센터 이용현황)에서 쓴다.
+// 그 파일의 모든 행은 한 시설 안에서 열린 행사라서, 시설명을 밖에서 한 번 지정해야
+// 자치구를 붙일 수 있다. 추측으로 채우지 않고 실행하는 사람이 명시하게 두는 이유다.
 //
 // 공공데이터포털 CSV는 EUC-KR(CP949)로 내려오는 경우가 많고, 컬럼명도 배포 시기마다 조금씩 다르다.
 // 그래서 인코딩을 자동 판별하고, 컬럼은 별칭 목록으로 찾는다. 매칭 결과는 실행 후 화면에 보고한다.
@@ -19,7 +23,9 @@ const COLUMN_ALIASES = {
   companies: ["참여업체", "참여업체수", "참가업체", "참가업체수"],
   booths: ["부스", "부스수", "부스규모", "참여부스"],
   items: ["전시품목", "품목", "전시분야"],
-  host: ["주최", "주최기관"],
+  // 배포본에 따라 "주최_주관"처럼 한 칸에 붙어 나온다. 그때는 host 한 곳에만 담고
+  // organizer 는 비워 둔다 (같은 값을 두 번 적으면 화면에 같은 문구가 두 번 찍힌다).
+  host: ["주최_주관", "주최·주관", "주최/주관", "주최", "주최기관"],
   organizer: ["주관", "주관기관"],
   phone: ["연락처", "전화번호", "문의처", "문의"],
   website: ["웹사이트", "홈페이지", "url", "website", "누리집"],
@@ -125,6 +131,12 @@ function buildColumnMap(headerRow) {
     }
   });
 
+  // 한 컬럼이 두 항목에 동시에 잡히면(예: "주최_주관") 뒤쪽을 버린다.
+  if (map.host !== undefined && map.host === map.organizer) {
+    delete map.organizer;
+    delete report.organizer;
+  }
+
   return { map, report };
 }
 
@@ -171,9 +183,18 @@ function normalizeUrl(value) {
 /* ---------- 실행 ---------- */
 
 function main() {
-  const input = process.argv[2];
+  const args = process.argv.slice(2);
+  const facilityArg = args.find((a) => a.startsWith("--facility="));
+  const facility = facilityArg ? facilityArg.slice("--facility=".length).trim() : "";
+  const input = args.find((a) => !a.startsWith("--"));
+
   if (!input) {
-    console.error("사용법: node scripts/convert-exhibitions.js <내려받은_CSV_경로>");
+    console.error("사용법: node scripts/convert-exhibitions.js <내려받은_CSV_경로> [--facility=시설명]");
+    process.exit(1);
+  }
+  if (facility && !VENUE_DISTRICTS[facility]) {
+    console.error(`"${facility}" 의 자치구를 모릅니다.`);
+    console.error("scripts/convert-exhibitions.js 의 VENUE_DISTRICTS 에 확인한 주소 기준으로 추가하세요.");
     process.exit(1);
   }
   if (!fs.existsSync(input)) {
@@ -209,13 +230,15 @@ function main() {
 
   const exhibitions = rows.slice(1).map((row, i) => {
     const venue = pick(row, "venue");
-    return {
+    const record = {
       id: i + 1,
       name: pick(row, "name"),
       start_date: toIsoDate(pick(row, "start_date")),
       end_date: toIsoDate(pick(row, "end_date")),
       venue,
-      district: findDistrict(venue),
+      facility,
+      // 장소 칸에 자치구가 적혀 있으면 그걸 쓰고, 없으면 지정한 시설의 자치구를 쓴다.
+      district: findDistrict(venue) || (facility ? VENUE_DISTRICTS[facility] : null),
       companies: toNumber(pick(row, "companies")),
       booths: toNumber(pick(row, "booths")),
       items: pick(row, "items"),
@@ -224,13 +247,21 @@ function main() {
       phone: pick(row, "phone"),
       website: normalizeUrl(pick(row, "website")),
     };
+
+    // 빈 칸은 아예 내보내지 않는다. 1,500건 규모에서는 null 나열만으로도
+    // 내려받는 용량이 두 배가 되고, 화면 쪽 isFilled 판정도 늘어난다.
+    Object.keys(record).forEach((k) => {
+      const v = record[k];
+      if (v === null || v === undefined || v === "") delete record[k];
+    });
+    return record;
   }).filter((ex) => ex.name);
 
   const output = {
     _readme:
-      "광주광역시관광공사_주관전시회 개최 현황 CSV를 scripts/convert-exhibitions.js 로 변환한 결과입니다. 원본이 갱신되면 스크립트를 다시 실행하세요.",
-    source_name: "광주광역시관광공사_주관전시회 개최 현황",
+      "광주광역시관광공사가 개방한 전시·행사 개최 현황 CSV를 scripts/convert-exhibitions.js 로 변환한 결과입니다. 원본이 갱신되면 스크립트를 다시 실행하세요.",
     provider: "광주광역시관광공사",
+    facility: facility || null,
     converted_at: new Date().toISOString().slice(0, 10),
     exhibitions,
   };
@@ -242,6 +273,7 @@ function main() {
 
   console.log("──────── 변환 결과 ────────");
   console.log(`인코딩       ${encoding}`);
+  if (facility) console.log(`시설         ${facility} (${VENUE_DISTRICTS[facility]})`);
   console.log(`전시회       ${exhibitions.length}건`);
   console.log("인식한 컬럼");
   Object.keys(report).forEach((k) => console.log(`  ${k.padEnd(12)} <- ${report[k]}`));
