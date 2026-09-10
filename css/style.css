@@ -1398,6 +1398,40 @@ h1, h2, h3, h4 {
   line-height: var(--lh-relaxed);
 }
 
+/* ---------- 교차 검증 출처 ---------- */
+
+.sources-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 var(--space-6);
+}
+
+.source-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-sm);
+}
+
+.source-name {
+  color: var(--text-mid);
+  overflow-wrap: anywhere;
+}
+
+/* 몇 곳에 쓰였는지 — 자릿수가 흔들리지 않게 고정폭 숫자를 쓴다. */
+.source-count {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- 데이터로 본 광주 ---------- */
 
 .insight-headline {

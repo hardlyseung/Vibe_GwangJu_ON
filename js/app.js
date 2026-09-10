@@ -1227,6 +1227,47 @@ function renderDatasets() {
   });
 }
 
+/* ---------- 교차 검증 출처 ----------
+   거점마다 어떤 자료를 근거로 삼았는지는 상세 화면에 한 줄씩 흩어져 있다.
+   모아 세지 않으면 "데이터셋 1종"으로만 보이는데, 실제로 대조한 자료는 그보다 많다.
+   숫자는 화면에 박아두지 않고 데이터에서 센다 — 출처가 늘거나 줄면 저절로 따라간다. */
+
+function renderSources() {
+  const block = document.getElementById("sources-block");
+  const list = document.getElementById("sources-list");
+  if (!block || !list) return;
+
+  // 한 거점이 여러 자료를 대조한 경우 " · " 로 이어 붙여 두었다.
+  const counts = new Map();
+  state.spots.forEach((spot) => {
+    if (!isFilled(spot.source_name)) return;
+    spot.source_name.split(" · ").forEach((raw) => {
+      const name = raw.trim();
+      if (!name) return;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+  });
+
+  if (!counts.size) {
+    block.hidden = true;
+    return;
+  }
+  block.hidden = false;
+
+  const hint = document.getElementById("sources-hint");
+  if (hint) hint.textContent = `${counts.size}종`;
+
+  clear(list);
+  [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"))
+    .forEach(([name, used]) => {
+      const item = el("li", "source-item");
+      item.appendChild(el("span", "source-name", name));
+      item.appendChild(el("span", "source-count", `${used}곳`));
+      list.appendChild(item);
+    });
+}
+
 /* ---------- 규칙 기반 빠른 안내 ---------- */
 
 function renderFaq() {
@@ -1616,6 +1657,7 @@ async function main() {
   renderFaq();
   renderExhibitions();
   renderDatasets();
+  renderSources();
   renderInsights();
   renderQuality();
 
