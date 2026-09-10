@@ -262,8 +262,47 @@ function parseBody(req) {
 // 서버리스는 인스턴스마다 메모리가 분리되므로 이 제한은 완벽하지 않지만,
 // 한 클라이언트가 한 인스턴스를 두들기는 최악의 경우는 막아준다.
 const RATE_WINDOW_MS = 60000;
-const RATE_MAX_PER_WINDOW = 20;
+const RATE_MAX_PER_WINDOW = 10;
 const rateHits = new Map();
+
+// 인증 없는 공개 엔드포인트가 하나의 무료 할당량을 2027-03-31까지 써야 한다.
+// 주소만 알면 누구나 두들길 수 있는 상태로 두면 남이 우리 할당량을 대신 태우고,
+// 그날로 운영 조건이 무너진다.
+//
+// 기본값은 "요청이 도착한 호스트와 같은 출처만 통과" 다. 배포 주소가 바뀌어도,
+// 프리뷰 배포가 생겨도 따로 설정할 필요가 없다.
+// 커스텀 도메인을 붙이면 ALLOWED_ORIGINS 에 쉼표로 나열한다.
+//
+// ⚠️ 한계: 헤더는 위조할 수 있다. 이 검사는 사고(다른 사이트에 끼워 넣기)와
+// 얌체 사용까지만 막는다. 작정하고 위조한 요청은 못 막으며, 그때 최종 방어선은
+// 아래 속도 제한과 구글 쪽 할당량이다.
+function hostOf(value) {
+  if (!value) return null;
+  try {
+    return new URL(value.includes("://") ? value : "https://" + value).host;
+  } catch (err) {
+    return null; // 깨진 Origin/Referer
+  }
+}
+
+function isAllowedOrigin(req) {
+  // 브라우저는 POST 에 Origin 을 항상 붙인다(동일 출처 포함).
+  // 혹시 빠지는 환경을 대비해 Referer 로 한 번 더 확인한다.
+  const origin = hostOf(req.headers.origin) || hostOf(req.headers.referer);
+  if (!origin) return false;
+
+  const allowList = String(process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(hostOf)
+    .filter(Boolean);
+
+  if (allowList.length) return allowList.includes(origin);
+
+  // 미설정이면 자기 자신만 — 기본값이 이미 안전해야 한다.
+  return origin === req.headers.host;
+}
 
 function isRateLimited(req) {
   const forwarded = String(req.headers["x-forwarded-for"] || "");
@@ -367,6 +406,12 @@ async function callGemini(apiKey, body, signal) {
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "POST 요청만 지원합니다." });
+    return;
+  }
+
+  if (!isAllowedOrigin(req)) {
+    console.warn(`[chat] 허용되지 않은 출처 origin=${req.headers.origin || "-"} host=${req.headers.host || "-"}`);
+    sendJson(res, 403, { error: "이 요청은 허용되지 않은 출처에서 왔습니다." });
     return;
   }
 
