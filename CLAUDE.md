@@ -85,6 +85,10 @@ scripts/convert-exhibitions.js 전시회 CSV → JSON
 node --check js/app.js
 node --check api/chat.js
 node -e "require('./data/places.json')"
+
+# 보안 방어 (의존성 없음)
+node tests/origin.js
+node tests/security.js
 ```
 
 `js/app.js` 가 참조하는 DOM id가 `index.html` 에 모두 존재하는지도 함께 본다.

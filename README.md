@@ -49,6 +49,8 @@ data/places.json                거점 18곳 + 데이터셋 선언 + 검증 기�
 data/exhibitions.json           전시회 (변환 전에는 빈 배열)
 scripts/geocode.js              주소 → 좌표 (카카오 로컬 API)
 scripts/convert-exhibitions.js  전시회 CSV → JSON
+tests/origin.js                 /api/chat 출처 검증 점검
+tests/security.js               보안 방어 자동 점검
 ```
 
 ## 로컬 실행
@@ -69,7 +71,8 @@ npx vercel dev
 ## 배포
 
 Vercel 에 GitHub 저장소를 연결하면 `main` 푸시마다 자동 배포됩니다.
-`api/` 아래 파일이 서버리스 함수로 자동 인식되므로 별도 빌드 설정이 없습니다 (`vercel.json` 은 `framework: null` 뿐).
+`api/` 아래 파일이 서버리스 함수로 자동 인식되므로 별도 빌드 설정이 없습니다.
+`vercel.json` 에는 빌드 설정 대신 보안 헤더만 들어 있습니다 ([SECURITY.md](SECURITY.md) 2-5 참고).
 
 ### 환경변수
 
@@ -111,6 +114,15 @@ node -e "require('./data/places.json')"
 
 `js/app.js` 가 참조하는 DOM id 가 `index.html` 에 모두 있는지도 함께 봅니다.
 실제 화면·지도·AI 응답은 배포된 주소에서 확인해야 합니다.
+
+보안 점검은 의존성 없이 바로 돌아갑니다.
+
+```bash
+node tests/origin.js      # 출처 검증 15건
+node tests/security.js    # 인젝션·비밀 차단·헤더 등 21건
+```
+
+무엇을 막고 무엇을 못 막는지는 [SECURITY.md](SECURITY.md) 에 적어 두었습니다.
 
 ## 알려진 한계
 
