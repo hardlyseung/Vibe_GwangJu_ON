@@ -452,8 +452,11 @@ h1, h2, h3, h4 {
   color: #fff;
 }
 
+/* 히어로가 첫 화면을 다 먹으면, 정작 쓸 수 있는 기능(거점 찾기)이 스크롤
+   아래로 밀린다. 무엇을 하는 곳인지 읽자마자 다음 섹션의 머리가 보이는
+   정도로 줄인다 — 스크롤할 이유를 화면 안에서 만들어 준다. */
 .hero-inner {
-  padding-block: clamp(var(--space-12), 9vw, var(--space-20));
+  padding-block: clamp(var(--space-10), 6.5vw, var(--space-16));
 }
 
 .hero-eyebrow {
@@ -476,7 +479,8 @@ h1, h2, h3, h4 {
 .hero-title {
   max-width: 14ch;
   margin: var(--space-4) 0 0;
-  font-size: clamp(2.25rem, 7vw, 4.25rem);
+  /* 다른 제목들과 같은 방식으로 — 값이 아니라 토큰에서 늘어나게 둔다. */
+  font-size: clamp(var(--fs-4xl), 7vw, 4.25rem);
   line-height: 1.1;
   letter-spacing: -0.055em;
 }
@@ -566,6 +570,17 @@ h1, h2, h3, h4 {
   font-weight: 600;
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
+}
+
+/* 아직 아무것도 고르지 않았을 때의 안내다. 채워진 내용과 같은 무게로 두면
+   빈 상자가 화면을 차지하고, 처음 온 사람은 그걸 지나쳐야 기능에 닿는다.
+   자리는 지키되 눈에는 덜 걸리게 한다. */
+/* 선택 전의 상세 패널은 내용이 아니라 자리다. 채워진 패널과 같은 면·그림자를
+   쓰면 빈 상자가 화면을 차지하고, 처음 온 사람은 그걸 지나쳐야 기능에 닿는다. */
+.panel:has(> .empty-hint:only-child) {
+  border-style: dashed;
+  background: none;
+  box-shadow: none;
 }
 
 .empty-hint {
@@ -1188,6 +1203,15 @@ h1, h2, h3, h4 {
   background: hsl(var(--primary-600));
 }
 
+/* 다크에서는 고른 달이 더 밝아야 앞으로 나온다. 라이트에서 쓰는 짙은 파랑을
+   그대로 두면 선택한 막대가 나머지보다 어두워져 오히려 뒤로 물러난다. */
+@media (prefers-color-scheme: dark) {
+  .month-bar.is-active .month-fill,
+  .month-bar:hover .month-fill {
+    background: hsl(var(--primary-100));
+  }
+}
+
 .month-name {
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -1215,19 +1239,21 @@ h1, h2, h3, h4 {
   gap: var(--space-4);
 }
 
-/* 전시 카드만 짙은 청색 면으로 둔다. 페이지에서 유일한 반전 블록이라
-   "지금 열려 있는 것"이 스크롤 중에 눈에 걸린다. */
+/* 한때 이 카드만 짙은 반전 블록이었다. "지금 열려 있는 전시"를 스크롤 중에
+   걸리게 하려던 것인데, 이 섹션이 "지난 개최 기록"으로 바뀌면서 그 이유가
+   사라졌다. 페이지에서 가장 시끄러운 블록이 가장 안 급한 내용을 담고 있으면
+   어디를 봐야 할지가 거짓으로 안내된다. 목록의 다른 카드와 같은 무게로 돌린다. */
 .exhibition-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   align-items: flex-start;
-  min-height: 168px;
+  min-height: 148px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-6);
-  background: linear-gradient(140deg, hsl(var(--primary-800)), hsl(var(--primary-900)));
-  color: #fff;
-  box-shadow: var(--shadow-sm);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .exhibition-top {
@@ -1238,7 +1264,7 @@ h1, h2, h3, h4 {
 }
 
 .exhibition-period {
-  color: hsl(var(--primary-200));
+  color: var(--text-soft);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -1252,41 +1278,21 @@ h1, h2, h3, h4 {
 
 .exhibition-venue {
   margin: 0;
-  color: hsl(var(--primary-100));
+  color: var(--text-mid);
   font-size: var(--fs-sm);
 }
 
 .exhibition-facts {
   margin: 0;
-  color: hsl(var(--primary-200));
+  color: var(--text-soft);
   font-size: var(--fs-xs);
 }
 
 .exhibition-site {
   margin-top: auto;
-  color: #fff;
+  color: var(--primary-text);
   font-size: var(--fs-xs);
   font-weight: 600;
-}
-
-/* 반전 카드 안에서는 배지·링크 색을 따로 잡아야 대비가 산다. */
-.exhibition-card .badge {
-  background: rgb(255 255 255 / 0.16);
-  color: #fff;
-}
-
-.exhibition-card .phase-ongoing {
-  background: hsl(var(--accent-400));
-  color: hsl(var(--primary-900));
-}
-
-.exhibition-card .phase-upcoming {
-  background: rgb(255 255 255 / 0.22);
-  color: #fff;
-}
-
-.exhibition-card :focus-visible {
-  outline-color: #fff;
 }
 
 .phase-ongoing {
@@ -1823,7 +1829,7 @@ h1, h2, h3, h4 {
   background: none;
   color: var(--text-soft);
   font-family: inherit;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   line-height: 1;
   cursor: pointer;
 }
