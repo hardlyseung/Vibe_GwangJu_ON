@@ -35,19 +35,19 @@
 
 ### 2. 좌표 채우기
 
-**권장 — 브라우저에서.** `geocode.html` 은 운영자만 쓰는 도구라 프로덕션에 배포하지
-않는다(`.vercelignore`). 로컬에서 정적 서버를 띄우고 연다 — 카카오 JavaScript 키는
-도메인 제한이 걸려 있어서 `file://` 로 직접 열면 지도 SDK 가 거부한다.
+**권장 — 브라우저에서.** 배포한 뒤 `https://<배포주소>/geocode.html` 을 열고
+버튼 한 번 누른다. 카카오맵 JavaScript 키만 쓰므로 REST 키 발급도, Node 설치도
+필요 없다.
+
+로컬에서 열려면 정적 서버를 띄운다 — 카카오 JavaScript 키는 도메인 제한이
+걸려 있어서 `file://` 로 직접 열면 지도 SDK 가 거부한다.
 
 ```bash
-# 저장소 폴더에서 (파이썬은 대부분 이미 깔려 있다)
-python3 -m http.server 3000
-# 또는  npx --yes serve -l 3000
+python3 -m http.server 3000    # 또는  npx --yes serve -l 3000
 ```
 
-그 다음 `http://localhost:3000/geocode.html` 을 열고 버튼 한 번 누른다.
-아래 3번에서 `http://localhost:3000` 을 카카오 콘솔에 등록해 두어야 동작한다.
-REST 키 발급은 필요 없다.
+그 다음 `http://localhost:3000/geocode.html`. 아래 3번에서
+`http://localhost:3000` 을 카카오 콘솔에 등록해 두어야 동작한다.
 
 결과를 복사해 GitHub 웹 편집기로 `data/places.json` 에 붙여넣고 커밋한다.
 **웹 편집기는 JSON 문법을 검사하지 않는다.** 커밋하면 GitHub Actions 가 파싱·내용을
@@ -159,7 +159,7 @@ Vercel 알림 메일을 받는 상태로 두는 것까지가 한 세트다.
 
 ```
 index.html                     # 화면 구조
-geocode.html                   # 좌표 채우기 도구 (로컬에서만 실행, 배포 제외)
+geocode.html                   # 좌표 채우기 도구 (브라우저에서 실행)
 css/style.css                  # 스타일 (다크모드 대응)
 js/app.js                      # 지도·필터·검색·상세·전시·AI 호출
 api/chat.js                    # 서버리스 함수 — 근거 조립 + Gemini 호출 + 차단/오류 처리

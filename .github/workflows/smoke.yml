@@ -95,6 +95,28 @@ jobs:
             console.log('거점 ' + d.spots.length + '곳');
           "
 
+      # .vercelignore 는 한 줄만 잘못 써도 css/style.css 나 js/app.js 를 통째로
+      # 배포에서 빼 버린다. 그러면 첫 화면은 여전히 200 이고 본문에 "광주"도
+      # 들어 있어서 앞 검사를 그대로 통과한다 — 스타일과 동작만 사라진 채로.
+      # 그래서 화면이 실제로 거는 주소를 전부 눌러 본다.
+      - name: 화면이 거는 주소가 전부 열리는가
+        run: |
+          URL="${{ steps.target.outputs.url }}"
+          bad=0
+          for path in css/style.css js/app.js data/places.json data/exhibitions.json geocode.html; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$URL/$path") || code="000"
+            if [ "$code" = "200" ]; then
+              echo "  200  /$path"
+            else
+              echo "  $code  /$path"
+              bad=1
+            fi
+          done
+          if [ "$bad" != "0" ]; then
+            echo "::error::배포에서 빠진 파일이 있습니다. .vercelignore 규칙이 화면에 필요한 파일을 걸러내고 있는지 확인하세요."
+            exit 1
+          fi
+
       - name: AI 해설이 실제로 답하는가
         run: |
           URL="${{ steps.target.outputs.url }}"
